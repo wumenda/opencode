@@ -1,4 +1,6 @@
-import { DataProvider } from "@opencode-ai/session-ui/context"
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
+import { DataProvider, McpAppRendererProvider, type McpAppRendererInput } from "@opencode-ai/session-ui/context"
+import { McpAppView } from "@/components/mcp-app-view"
 import { showToast } from "@/utils/toast"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { useLocation, useNavigate, useParams } from "@solidjs/router"
@@ -12,6 +14,20 @@ import { Schema } from "effect"
 import type { ServerConnection } from "@/context/server"
 import { sessionHref } from "@/utils/session-route"
 import { useServerSync } from "@/context/server-sync"
+
+function renderMcpApp(input: McpAppRendererInput) {
+  return (
+    <McpAppView
+      server={input.server}
+      resourceUri={input.resourceUri}
+      fallbackData={
+        typeof input.fallbackData === "object" && input.fallbackData !== null
+          ? (input.fallbackData as CallToolResult)
+          : undefined
+      }
+    />
+  )
+}
 
 export function DirectoryDataProvider(
   props: ParentProps<{
@@ -67,7 +83,9 @@ export function DirectoryDataProvider(
           onNavigateToSession={(sessionID: string) => navigate(href(sessionID))}
           onSessionHref={href}
         >
-          <LocalProvider>{props.children}</LocalProvider>
+          <McpAppRendererProvider render={renderMcpApp}>
+            <LocalProvider>{props.children}</LocalProvider>
+          </McpAppRendererProvider>
         </DataProvider>
       )}
     </Show>

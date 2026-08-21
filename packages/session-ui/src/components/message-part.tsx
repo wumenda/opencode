@@ -62,6 +62,7 @@ import { AnimatedCountList } from "./tool-count-summary"
 import { ToolStatusTitle } from "./tool-status-title"
 import { patchFiles } from "./apply-patch-file"
 import { partDefaultOpen } from "./part-default-open"
+import { McpTool } from "./mcp-tool"
 import { animate } from "motion"
 import { attached, inline, kind, typeLabel } from "./message-file"
 import { readPartText } from "./message-part-text"
@@ -1608,23 +1609,37 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
             }}
           </Match>
           <Match when={true}>
-            <Dynamic
-              component={render()}
-              input={input()}
-              tool={part().tool}
-              sessionID={part().sessionID}
-              metadata={partMetadata()}
-              // @ts-expect-error
-              output={part().state.output}
-              status={part().state.status}
-              hideDetails={props.hideDetails}
-              defaultOpen={props.defaultOpen}
-              open={controlledOpen()}
-              onOpenChange={props.onToolOpenChange ? handleToolOpenChange : undefined}
-              deferContent={props.deferToolContent}
-              virtualizeDiff={props.virtualizeDiff}
-              onContentRendered={props.onContentRendered}
-            />
+            <Show
+              when={typeof partMetadata().mcp === "object" && partMetadata().mcp !== null}
+              fallback={
+                <Dynamic
+                  component={render()}
+                  input={input()}
+                  tool={part().tool}
+                  sessionID={part().sessionID}
+                  metadata={partMetadata()}
+                  // @ts-expect-error
+                  output={part().state.output}
+                  status={part().state.status}
+                  hideDetails={props.hideDetails}
+                  defaultOpen={props.defaultOpen}
+                  open={controlledOpen()}
+                  onOpenChange={props.onToolOpenChange ? handleToolOpenChange : undefined}
+                  deferContent={props.deferToolContent}
+                  virtualizeDiff={props.virtualizeDiff}
+                  onContentRendered={props.onContentRendered}
+                />
+              }
+            >
+              <McpTool
+                part={part()}
+                hideDetails={props.hideDetails}
+                defaultOpen={props.defaultOpen}
+                open={controlledOpen()}
+                onOpenChange={props.onToolOpenChange ? handleToolOpenChange : undefined}
+                deferContent={props.deferToolContent}
+              />
+            </Show>
           </Match>
         </Switch>
       </div>

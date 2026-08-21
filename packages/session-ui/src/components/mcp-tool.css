@@ -1,0 +1,20 @@
+[data-component="mcp-tool"] {
+  display: flex;
+  flex-direction: column;
+
+  [data-slot="mcp-tool-progress"] {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+
+    [data-component="progress"] {
+      flex: 1;
+      gap: 8px;
+    }
+  }
+
+  [data-slot="mcp-tool-progress-label"] {
+    font-size: var(--font-size-small);
+    color: var(--text-weak);
+  }
+}
