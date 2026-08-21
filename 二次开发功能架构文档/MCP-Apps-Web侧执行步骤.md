@@ -95,6 +95,14 @@ packages/app（SolidJS）
      - client 侧 UI 能力协商是否由 AppBridge 自动处理。
    - **若实际 API 与本文档假设不符，以 .d.ts 为准并在本文档记录差异后再继续。**
 
+   **API 确认记录（2026-08-21，以 ext-apps@1.7.5 .d.ts 为准）**：
+   - ext-apps 为稳定版 1.7.5（非预期的 2026.x 预发布）；
+   - `AppBridge` 构造签名：`new AppBridge(client: Client | null, hostInfo, capabilities)` —— 接收 MCP SDK **Client 实例**（非 Transport）；iframe 通信用 `PostMessageTransport(iframe.contentWindow, iframe.contentWindow)` 传给 `bridge.connect()`；
+   - `PostMessageTransport` 通过 `event.source === iframe.contentWindow` 验证消息来源（安全假设成立）；
+   - **AppBridge 要求浏览器侧 Client 先完成 initialize 握手**（`client.connect(transport)` 后才能 `bridge.connect()`）→ `HttpRpcTransport` 承载 Client 的全部 JSON-RPC 消息（initialize/tools/call 等）；
+   - peer 依赖 `@modelcontextprotocol/sdk@^1.29.0`、`zod@^4`（运行时 `import "zod/v4"`）需显式安装：已装 `@modelcontextprotocol/sdk@1.29.0`（与 host 同版本）+ `zod@4.4.3`；
+   - **偏差**：vendored client（`opencode-ai-client-1.17.13-v2.tgz`）的 `mcp` 命名空间无 `rpc` 方法（host 提交未重新生成 client SDK），transport 改用原生 `fetch`（测试注入 `fetchFn`），不走 `client.mcp.rpc()`。
+
 2. **TDD：`src/lib/mcp-apps/http-rpc-transport.ts`**
    - 先写 `src/lib/mcp-apps/http-rpc-transport.test.ts`：
      - 请求消息（带 `id`）→ fetch 收到 `POST /mcp/:name/rpc`，body 为 `{method, params}`；
