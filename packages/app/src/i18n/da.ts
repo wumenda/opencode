@@ -326,6 +326,12 @@ export const dict = {
   "mcp.status.failed": "mislykkedes",
   "mcp.status.needs_auth": "kræver godkendelse",
   "mcp.auth.clickToAuthenticate": "Klik for at godkende",
+  "mcp.app.loading": "Indlæser app…",
+  "mcp.app.retry": "Prøv igen",
+  "mcp.app.notConfigured": "MCP-serveren er ikke konfigureret",
+  "mcp.app.needsAuth": "MCP-serveren kræver godkendelse",
+  "mcp.app.connectFailed": "Kunne ikke oprette forbindelse til MCP-serveren",
+  "mcp.app.connectTimeout": "Forbindelse til MCP-serveren fik timeout",
   "mcp.status.disabled": "deaktiveret",
 
   "dialog.fork.empty": "Ingen beskeder at forgrene fra",

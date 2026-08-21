@@ -427,6 +427,12 @@ export const dict = {
   "mcp.status.failed": "ошибка",
   "mcp.status.needs_auth": "требуется авторизация",
   "mcp.auth.clickToAuthenticate": "Нажмите, чтобы авторизоваться",
+  "mcp.app.loading": "Загрузка приложения…",
+  "mcp.app.retry": "Повторить попытку",
+  "mcp.app.notConfigured": "Сервер MCP не настроен",
+  "mcp.app.needsAuth": "Сервер MCP требует аутентификации",
+  "mcp.app.connectFailed": "Не удалось подключиться к серверу MCP",
+  "mcp.app.connectTimeout": "Истекло время ожидания подключения к серверу MCP",
   "mcp.status.disabled": "отключено",
 
   "dialog.fork.empty": "Нет сообщений для ответвления",

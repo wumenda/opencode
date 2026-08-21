@@ -430,6 +430,12 @@ export const dict = {
   "mcp.status.failed": "fallido",
   "mcp.status.needs_auth": "requiere autenticación",
   "mcp.auth.clickToAuthenticate": "Haz clic para autenticar",
+  "mcp.app.loading": "Cargando la aplicación…",
+  "mcp.app.retry": "Reintentar",
+  "mcp.app.notConfigured": "El servidor MCP no está configurado",
+  "mcp.app.needsAuth": "El servidor MCP requiere autenticación",
+  "mcp.app.connectFailed": "No se pudo conectar al servidor MCP",
+  "mcp.app.connectTimeout": "Se agotó el tiempo de conexión al servidor MCP",
   "mcp.status.disabled": "deshabilitado",
 
   "dialog.fork.empty": "No hay mensajes desde donde bifurcar",

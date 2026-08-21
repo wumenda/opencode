@@ -429,6 +429,12 @@ export const dict = {
   "mcp.status.failed": "neuspjelo",
   "mcp.status.needs_auth": "potrebna autentifikacija",
   "mcp.auth.clickToAuthenticate": "Klikni za autentifikaciju",
+  "mcp.app.loading": "Učitavanje aplikacije…",
+  "mcp.app.retry": "Pokušaj ponovo",
+  "mcp.app.notConfigured": "MCP server nije konfigurisan",
+  "mcp.app.needsAuth": "MCP server zahtijeva autentifikaciju",
+  "mcp.app.connectFailed": "Povezivanje sa MCP serverom nije uspjelo",
+  "mcp.app.connectTimeout": "Isteklo je vrijeme za povezivanje sa MCP serverom",
   "mcp.status.disabled": "onemogućeno",
 
   "dialog.fork.empty": "Nema poruka za fork",

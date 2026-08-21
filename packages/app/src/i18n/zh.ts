@@ -446,6 +446,12 @@ export const dict = {
   "mcp.status.failed": "失败",
   "mcp.status.needs_auth": "需要授权",
   "mcp.auth.clickToAuthenticate": "点击进行授权",
+  "mcp.app.loading": "正在加载应用…",
+  "mcp.app.retry": "重试",
+  "mcp.app.notConfigured": "MCP 服务器未配置",
+  "mcp.app.needsAuth": "MCP 服务器需要身份验证",
+  "mcp.app.connectFailed": "MCP 服务器连接失败",
+  "mcp.app.connectTimeout": "MCP 服务器连接超时",
   "mcp.status.disabled": "已禁用",
 
   "dialog.fork.empty": "没有可用于创建新会话的消息",

@@ -426,6 +426,12 @@ export const dict = {
   "mcp.status.failed": "ล้มเหลว",
   "mcp.status.needs_auth": "ต้องยืนยันตัวตน",
   "mcp.auth.clickToAuthenticate": "คลิกเพื่อยืนยันตัวตน",
+  "mcp.app.loading": "กำลังโหลดแอป…",
+  "mcp.app.retry": "ลองอีกครั้ง",
+  "mcp.app.notConfigured": "ไม่ได้กำหนดค่าเซิร์ฟเวอร์ MCP",
+  "mcp.app.needsAuth": "เซิร์ฟเวอร์ MCP ต้องการการยืนยันตัวตน",
+  "mcp.app.connectFailed": "เชื่อมต่อเซิร์ฟเวอร์ MCP ไม่สำเร็จ",
+  "mcp.app.connectTimeout": "การเชื่อมต่อเซิร์ฟเวอร์ MCP หมดเวลา",
   "mcp.status.disabled": "ปิดใช้งาน",
 
   "dialog.fork.empty": "ไม่มีข้อความให้แตกแขนง",

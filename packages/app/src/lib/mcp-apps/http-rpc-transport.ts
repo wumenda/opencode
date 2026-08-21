@@ -8,6 +8,7 @@ export type HttpRpcTransportOptions = {
   readonly server: string
   /** Base URL of the opencode server, e.g. "http://localhost:4096". */
   readonly baseUrl: string
+
   /** Optional workspace directory for instance routing. */
   readonly directory?: string
   /** Extra headers (e.g. Authorization) attached to every RPC call. */
@@ -21,10 +22,10 @@ const SERVER_ERROR = -32000
 
 /**
  * Bridges the browser-side MCP Client onto the host's JSON-RPC relay endpoint
- * `POST /mcp/:name/rpc`. The relay answers with the bare JSON-RPC result, so
- * responses are re-wrapped into full JSON-RPC response messages before being
- * handed to the client. Notifications are fire-and-forget: the relay may
- * reject them with 400 and the client never expects a reply.
+ * `POST /api/mcp/:name/rpc`. The relay answers with the bare JSON-RPC result,
+ * so responses are re-wrapped into full JSON-RPC response messages before
+ * being handed to the client. Notifications are fire-and-forget: the relay
+ * may reject them with 400 and the client never expects a reply.
  */
 export class HttpRpcTransport implements Transport {
   onclose?: () => void
@@ -38,7 +39,7 @@ export class HttpRpcTransport implements Transport {
   private closed = false
 
   constructor(options: HttpRpcTransportOptions) {
-    const url = new URL(`/mcp/${encodeURIComponent(options.server)}/rpc`, options.baseUrl)
+    const url = new URL(`/api/mcp/${encodeURIComponent(options.server)}/rpc`, options.baseUrl)
     if (options.directory) url.searchParams.set("directory", options.directory)
     this.url = url.toString()
     this.fetchFn = options.fetchFn ?? globalThis.fetch

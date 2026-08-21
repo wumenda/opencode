@@ -431,6 +431,12 @@ export const dict = {
   "mcp.status.needs_auth": "потрібна авторизація",
   "mcp.status.disabled": "вимкнено",
   "mcp.auth.clickToAuthenticate": "Натисніть для автентифікації",
+  "mcp.app.loading": "Завантаження застосунку…",
+  "mcp.app.retry": "Спробувати ще раз",
+  "mcp.app.notConfigured": "Сервер MCP не налаштовано",
+  "mcp.app.needsAuth": "Сервер MCP вимагає автентифікації",
+  "mcp.app.connectFailed": "Не вдалося підключитися до сервера MCP",
+  "mcp.app.connectTimeout": "Час очікування підключення до сервера MCP вичерпано",
 
   "dialog.fork.empty": "Немає повідомлень для відгалуження",
 

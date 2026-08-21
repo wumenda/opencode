@@ -433,6 +433,12 @@ export const dict = {
   "mcp.status.failed": "başarısız",
   "mcp.status.needs_auth": "kimlik doğrulama gerekli",
   "mcp.auth.clickToAuthenticate": "Kimlik doğrulamak için tıklayın",
+  "mcp.app.loading": "Uygulama yükleniyor…",
+  "mcp.app.retry": "Yeniden dene",
+  "mcp.app.notConfigured": "MCP sunucusu yapılandırılmamış",
+  "mcp.app.needsAuth": "MCP sunucusu kimlik doğrulaması gerektiriyor",
+  "mcp.app.connectFailed": "MCP sunucusuna bağlanılamadı",
+  "mcp.app.connectTimeout": "MCP sunucusu bağlantısı zaman aşımına uğradı",
   "mcp.status.disabled": "devre dışı",
 
   "dialog.fork.empty": "Dallandırılacak mesaj yok",

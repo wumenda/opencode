@@ -430,6 +430,12 @@ export const dict = {
   "mcp.status.needs_auth": "perlu autentikasi",
   "mcp.status.disabled": "nonaktif",
   "mcp.auth.clickToAuthenticate": "Klik untuk mengautentikasi",
+  "mcp.app.loading": "Memuat aplikasi…",
+  "mcp.app.retry": "Coba lagi",
+  "mcp.app.notConfigured": "Server MCP belum dikonfigurasi",
+  "mcp.app.needsAuth": "Server MCP memerlukan autentikasi",
+  "mcp.app.connectFailed": "Gagal terhubung ke server MCP",
+  "mcp.app.connectTimeout": "Koneksi ke server MCP waktu habis",
 
   "dialog.fork.empty": "Tidak ada pesan yang dapat dicabangkan",
 

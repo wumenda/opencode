@@ -26,7 +26,7 @@ function makeTransport(overrides?: Partial<ConstructorParameters<typeof HttpRpcT
 }
 
 describe("HttpRpcTransport", () => {
-  test("sends JSON-RPC requests to POST /mcp/:name/rpc with {method, params} body", async () => {
+  test("sends JSON-RPC requests to POST /api/mcp/:name/rpc with {method, params} body", async () => {
     const { requests, fetchFn } = setup({ body: { protocolVersion: "2025-06-18", capabilities: {} } })
     const transport = makeTransport({ fetchFn })
     const received: unknown[] = []
@@ -38,7 +38,7 @@ describe("HttpRpcTransport", () => {
     expect(requests.length).toBe(1)
     const request = requests[0]!
     expect(request.method).toBe("POST")
-    expect(new URL(request.url).pathname).toBe("/mcp/weather/rpc")
+    expect(new URL(request.url).pathname).toBe("/api/mcp/weather/rpc")
     expect(request.headers.get("content-type")).toBe("application/json")
     expect(await request.json()).toEqual({
       method: "initialize",

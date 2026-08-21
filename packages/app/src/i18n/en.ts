@@ -333,6 +333,13 @@ export const dict = {
   "mcp.status.disabled": "disabled",
   "mcp.auth.clickToAuthenticate": "Click to authenticate",
 
+  "mcp.app.loading": "Loading app…",
+  "mcp.app.retry": "Retry",
+  "mcp.app.notConfigured": "MCP server is not configured",
+  "mcp.app.needsAuth": "MCP server requires authentication",
+  "mcp.app.connectFailed": "MCP server failed to connect",
+  "mcp.app.connectTimeout": "MCP server connection timed out",
+
   "dialog.fork.empty": "No messages to fork from",
 
   "dialog.directory.search.placeholder": "Search folders",
