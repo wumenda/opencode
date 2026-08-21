@@ -28,6 +28,11 @@ export interface MockServerConfig {
   fileContent?: (path: string) => unknown | Promise<unknown>
   findFiles?: (input: { query: string; dirs?: string; limit?: number }) => unknown
   sessionStatus?: Record<string, unknown> | (() => Record<string, unknown>)
+  /** MCP Apps relay: servers already connected plus a JSON-RPC responder for /api/mcp/:name/rpc. */
+  mcpApps?: {
+    servers?: Array<{ name: string; status?: string }>
+    rpc?: (rpc: { name: string; method: string; params: unknown }) => unknown
+  }
 }
 
 export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
@@ -135,7 +140,25 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
         ],
       })
     if (path === "/api/command") return json(route, { location: location(config), data: [] })
-    if (path === "/api/mcp") return json(route, { location: location(config), data: [] })
+    if (path === "/api/mcp") {
+      if (!config.mcpApps) return json(route, { location: location(config), data: [] })
+      const servers = (config.mcpApps.servers ?? []).map((server) => ({
+        name: server.name,
+        status: { status: server.status ?? "connected" },
+      }))
+      return json(route, { location: location(config), data: servers })
+    }
+    if (path === "/api/mcp/connect" && route.request().method() === "POST") {
+      if (!config.mcpApps) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" } })
+      return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } })
+    }
+    const rpcMatch = path.match(/^\/api\/mcp\/([^/]+)\/rpc$/)
+    if (rpcMatch && route.request().method() === "POST" && config.mcpApps?.rpc) {
+      const name = decodeURIComponent(rpcMatch[1]!)
+      const body = route.request().postDataJSON() as { method: string; params?: unknown }
+      const result = config.mcpApps.rpc({ name, method: body.method, params: body.params })
+      return json(route, result)
+    }
     if (path === "/api/mcp/resource")
       return json(route, { location: location(config), data: { resources: [], templates: [] } })
     const integration = path.match(/^\/api\/integration\/([^/]+)$/)?.[1]

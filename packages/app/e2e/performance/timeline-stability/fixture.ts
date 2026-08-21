@@ -98,6 +98,7 @@ export async function setupTimeline(
     deviceScaleFactor?: number
     seedHistory?: boolean
     protocol?: "v1" | "v2"
+    mcpApps?: Parameters<typeof mockOpenCodeServer>[1]["mcpApps"]
   } = {},
 ) {
   const sessions = input.sessions ?? [session()]
@@ -121,6 +122,7 @@ export async function setupTimeline(
     provider: provider(),
     sessions,
     sessionStatus: { [sessionID]: initialStatus },
+    mcpApps: input.mcpApps,
     pageMessages: () => ({
       items: messages,
     }),

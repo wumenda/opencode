@@ -12,7 +12,9 @@
       "description": "Contains opencode logs and data",
     },
   },
-  "mcp": {},
+  "mcp": {
+    "ui-server": { "type": "local", "command": ["bun", "run", "packages/opencode/test/mcp/fixtures/ui-server.ts"] }
+  },
   "tools": {
     "github-triage": false,
     "github-pr-search": false,
