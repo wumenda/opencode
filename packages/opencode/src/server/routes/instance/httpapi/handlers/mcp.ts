@@ -1,9 +1,20 @@
 import { MCP } from "@/mcp"
+import type { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index.js"
+import {
+  LATEST_PROTOCOL_VERSION,
+  type CallToolRequest,
+  type GetPromptRequest,
+  type ListPromptsRequest,
+  type ListResourceTemplatesRequest,
+  type ListResourcesRequest,
+  type ListToolsRequest,
+  type ReadResourceRequest,
+} from "@modelcontextprotocol/sdk/types.js"
 import { Effect, Schema } from "effect"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { McpServerNotFoundError } from "../errors"
-import { AddPayload, AuthCallbackPayload, StatusMap, UnsupportedOAuthError } from "../groups/mcp"
+import { AddPayload, AuthCallbackPayload, McpRpcError, RpcPayload, StatusMap, UnsupportedOAuthError } from "../groups/mcp"
 
 export const mcpHandlers = HttpApiBuilder.group(InstanceHttpApi, "mcp", (handlers) =>
   Effect.gen(function* () {
@@ -98,6 +109,25 @@ export const mcpHandlers = HttpApiBuilder.group(InstanceHttpApi, "mcp", (handler
       return true
     })
 
+    const rpc = Effect.fn("McpHttpApi.rpc")(function* (ctx: {
+      params: { name: string }
+      payload: typeof RpcPayload.Type
+    }) {
+      const clients = yield* mcp.clients()
+      const client = clients[ctx.params.name]
+      if (!client)
+        return yield* new McpServerNotFoundError({
+          name: ctx.params.name,
+          message: `MCP server not found: ${ctx.params.name}`,
+        })
+      const call = rpcCall(client, ctx.payload.method, ctx.payload.params)
+      if (!call) return yield* new McpRpcError({ message: `Unsupported MCP method: ${ctx.payload.method}` })
+      return yield* Effect.tryPromise({
+        try: call,
+        catch: (error) => new McpRpcError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    })
+
     return handlers
       .handle("status", status)
       .handle("add", add)
@@ -107,5 +137,45 @@ export const mcpHandlers = HttpApiBuilder.group(InstanceHttpApi, "mcp", (handler
       .handle("authRemove", authRemove)
       .handle("connect", connect)
       .handle("disconnect", disconnect)
+      .handle("rpc", rpc)
   }),
 )
+
+/**
+ * Maps a JSON-RPC style MCP method onto the already-connected server client.
+ * Returns undefined for methods the host does not relay.
+ */
+function rpcCall(
+  client: MCPClient,
+  method: string,
+  params: unknown,
+): (() => Promise<unknown>) | undefined {
+  const p = (params ?? {}) as Record<string, unknown>
+  switch (method) {
+    case "initialize":
+      return () =>
+        Promise.resolve({
+          protocolVersion: LATEST_PROTOCOL_VERSION,
+          capabilities: client.getServerCapabilities() ?? {},
+          serverInfo: client.getServerVersion() ?? { name: "unknown", version: "0.0.0" },
+          instructions: client.getInstructions(),
+        })
+    case "ping":
+      return () => Promise.resolve({})
+    case "tools/list":
+      return () => client.listTools(p as ListToolsRequest["params"])
+    case "tools/call":
+      return () => client.callTool(p as CallToolRequest["params"])
+    case "resources/list":
+      return () => client.listResources(p as ListResourcesRequest["params"])
+    case "resources/read":
+      return () => client.readResource(p as ReadResourceRequest["params"])
+    case "resources/templates/list":
+      return () => client.listResourceTemplates(p as ListResourceTemplatesRequest["params"])
+    case "prompts/list":
+      return () => client.listPrompts(p as ListPromptsRequest["params"])
+    case "prompts/get":
+      return () => client.getPrompt(p as GetPromptRequest["params"])
+  }
+  return undefined
+}

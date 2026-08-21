@@ -28,6 +28,15 @@ export class UnsupportedOAuthError extends Schema.ErrorClass<UnsupportedOAuthErr
   { error: Schema.String },
   { httpApiStatus: 400 },
 ) {}
+export class McpRpcError extends Schema.ErrorClass<McpRpcError>("McpRpcError")(
+  { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+export const RpcPayload = Schema.Struct({
+  method: Schema.String,
+  params: Schema.optional(Schema.UndefinedOr(Schema.Unknown)),
+})
 
 export const McpPaths = {
   status: "/mcp",
@@ -36,6 +45,7 @@ export const McpPaths = {
   authAuthenticate: "/mcp/:name/auth/authenticate",
   connect: "/mcp/:name/connect",
   disconnect: "/mcp/:name/disconnect",
+  rpc: "/mcp/:name/rpc",
 } as const
 
 export const McpApi = HttpApi.make("mcp")
@@ -134,6 +144,20 @@ export const McpApi = HttpApi.make("mcp")
           OpenApi.annotations({
             identifier: "mcp.disconnect",
             description: "Disconnect an MCP server.",
+          }),
+        ),
+        HttpApiEndpoint.post("rpc", McpPaths.rpc, {
+          params: { name: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: RpcPayload,
+          success: described(Schema.Unknown, "JSON-RPC style MCP method result"),
+          error: [McpServerNotFoundError, McpRpcError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "mcp.rpc",
+            summary: "Relay an MCP method call",
+            description:
+              "Relays a JSON-RPC style MCP method (initialize, ping, tools/list, tools/call, resources/*, prompts/*) to a connected MCP server. Used by MCP Apps views to reach their server through the host.",
           }),
         ),
       )

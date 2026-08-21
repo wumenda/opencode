@@ -31,6 +31,7 @@ function mcpTool(
 ): MCP.McpTool {
   return {
     def: { name, description: name, inputSchema, ...(outputSchema ? { outputSchema } : {}) } as MCPToolDef,
+    server: "test",
     client: {
       callTool: async (params: { arguments?: Record<string, unknown> }) => handler(params.arguments ?? {}),
     } as unknown as MCP.McpTool["client"],
@@ -202,6 +203,7 @@ describe("code mode execute", () => {
           description: `${filler}${i}`,
           inputSchema: { type: "object", properties: { value: { type: "string" }, count: { type: "number" } } },
         } as MCPToolDef,
+        server: "alpha",
         client: { callTool: async () => ({ content: [] }) } as unknown as MCP.McpTool["client"],
       }
     }

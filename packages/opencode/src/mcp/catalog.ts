@@ -39,7 +39,49 @@ export function defs(client: Client, timeout?: number) {
   return listTools(client, timeout ?? DEFAULT_TIMEOUT).pipe(Effect.catch(() => Effect.void))
 }
 
-export function convertTool(mcpTool: MCPToolDef, client: Client, timeout?: number): Tool {
+export interface McpProgress {
+  progress: number
+  total?: number
+  message?: string
+}
+
+/** MCP Apps (SEP-1865) UI metadata from a tool definition's `_meta`. */
+export interface McpToolUi {
+  resourceUri?: string
+  visibility: Array<"model" | "app">
+}
+
+const DEFAULT_UI_VISIBILITY: McpToolUi["visibility"] = ["model", "app"]
+
+/**
+ * Reads `_meta.ui` from an MCP tool definition, normalizing the deprecated
+ * flat `_meta["ui/resourceUri"]` form. Returns undefined when the tool has no
+ * UI metadata.
+ */
+export function toolUi(def: MCPToolDef): McpToolUi | undefined {
+  const meta = def._meta
+  if (meta === undefined || meta === null || typeof meta !== "object") return undefined
+  const record = meta as Record<string, unknown>
+  const ui = record["ui"]
+  const uiRecord = typeof ui === "object" && ui !== null ? (ui as Record<string, unknown>) : undefined
+  const resourceUriFromUi = typeof uiRecord?.["resourceUri"] === "string" ? uiRecord["resourceUri"] : undefined
+  const resourceUriFromDeprecated =
+    typeof record["ui/resourceUri"] === "string" ? record["ui/resourceUri"] : undefined
+  if (resourceUriFromUi === undefined && resourceUriFromDeprecated === undefined && uiRecord === undefined)
+    return undefined
+  const visibilityRaw = uiRecord?.["visibility"]
+  const visibility = Array.isArray(visibilityRaw)
+    ? visibilityRaw.filter((value): value is "model" | "app" => value === "model" || value === "app")
+    : DEFAULT_UI_VISIBILITY
+  return { resourceUri: resourceUriFromUi ?? resourceUriFromDeprecated, visibility }
+}
+
+export function convertTool(
+  mcpTool: MCPToolDef,
+  client: Client,
+  timeout?: number,
+  onProgress?: (progress: McpProgress, toolCallId: string) => void,
+): Tool {
   const inputSchema: JSONSchema7 = {
     ...(mcpTool.inputSchema as JSONSchema7),
     type: "object",
@@ -62,7 +104,7 @@ export function convertTool(mcpTool: MCPToolDef, client: Client, timeout?: numbe
           signal: options.abortSignal,
           timeout,
           // The MCP SDK only sends a progress token when this hook is present, enabling timeout resets.
-          onprogress: () => {},
+          onprogress: (p) => onProgress?.({ progress: p.progress, total: p.total, message: p.message }, options.toolCallId),
         },
       )
       if (result.isError)

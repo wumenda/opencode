@@ -388,7 +388,31 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   if (flags.experimentalCodeMode) return tools
 
   for (const [key, entry] of Object.entries(yield* mcp.tools())) {
-    const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout)
+    // MCP Apps (SEP-1865): tools whose UI visibility excludes the model stay
+    // app-only and must not join the agent's tool list.
+    const ui = McpCatalog.toolUi(entry.def)
+    if (ui && !ui.visibility.includes("model")) continue
+    const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout, (progress, toolCallId) =>
+      run.fork(
+        input.processor.updateToolCall(toolCallId, (match) => {
+          if (match.state.status === "completed" || match.state.status === "error") return match
+          const state = match.state.status === "running" ? match.state : undefined
+          return {
+            ...match,
+            state: {
+              title: state?.title,
+              metadata: {
+                ...state?.metadata,
+                mcpProgress: { ...progress, time: Date.now() },
+              },
+              status: "running" as const,
+              input: match.state.input,
+              time: { start: state?.time.start ?? Date.now() },
+            },
+          }
+        }),
+      ),
+    )
     const execute = item.execute
     if (!execute) continue
 
@@ -464,6 +488,19 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
           const metadata = {
             ...result.metadata,
+            // MCP Apps (SEP-1865): server identity + UI metadata so web clients
+            // can resolve `ui://` resources and render the app for this result.
+            ...(ui
+              ? {
+                  mcp: {
+                    server: entry.server,
+                    tool: entry.def.name,
+                    ui,
+                    ...(isRecord(result._meta) ? { meta: result._meta } : {}),
+                    result: { content: result.content, structuredContent: result.structuredContent },
+                  },
+                }
+              : {}),
             truncated: truncated.truncated,
             ...(truncated.truncated && { outputPath: truncated.outputPath }),
           }

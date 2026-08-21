@@ -46,6 +46,11 @@ const CLIENT_OPTIONS = {
     roots: {},
     // https://github.com/anomalyco/opencode/issues/28567
     // tasks: {},
+    // MCP Apps extension (SEP-1865): lets servers expose interactive UI
+    // resources referenced from tool `_meta.ui`.
+    extensions: {
+      "io.modelcontextprotocol/ui": {},
+    },
   },
 } satisfies ClientOptions
 
@@ -158,6 +163,8 @@ export interface McpTool {
   /** Shared cached definition; consumers must copy rather than mutate it. */
   readonly def: MCPToolDef
   readonly client: MCPClient
+  /** Configured name of the owning MCP server. */
+  readonly server: string
   readonly timeout?: number
 }
 
@@ -681,7 +688,7 @@ const layer = Layer.effect(
         }
         const timeout = requestTimeout(s, clientName, mcpConfig, defaultTimeout)
         for (const def of listed) {
-          result[McpCatalog.toolName(clientName, def.name)] = { def, client, timeout }
+          result[McpCatalog.toolName(clientName, def.name)] = { def, client, server: clientName, timeout }
         }
       }
       return result
