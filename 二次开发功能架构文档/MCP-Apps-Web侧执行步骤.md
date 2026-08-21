@@ -251,6 +251,23 @@ packages/app（SolidJS）
 
 ## 5. 端到端验证留痕（任务 9 完成后填写）
 
+### 已自动化完成的验证（单测级，全绿）
+
+- [x] **toolUi() 单测**（`packages/opencode/test/mcp/mcp-ui.test.ts`，4 例）：`_meta.ui.resourceUri` 新格式 / `_meta["ui/resourceUri"]` 废弃格式 / 无 `_meta` 返回 undefined / `visibility: ["app"]` 保留 app-only。
+- [x] **rpc handler 集成测试**（`packages/opencode/test/server/httpapi-mcp-rpc.test.ts`）：真实 HTTP MCP SDK server，验证 `tools/list` 200 转发、`resources/subscribe` 400（McpRpcError）、缺失 server 404（McpServerNotFoundError）。
+- [x] **最小 MCP Apps 测试 server**（`packages/opencode/test/mcp/fixtures/ui-server.ts`）：stdio server，暴露 `show_dashboard` 工具（`_meta.ui.resourceUri = "ui://dashboard"`）与 `ui://dashboard` 资源（HTML 内含调用 `tools/list` 的按钮，验证 AppBridge 双向通信）。
+
+### 手动端到端清单（需真实模型 provider，待执行）
+
+```
+a. opencode.json 配置 ui-server（stdio）：
+   "mcp": { "ui-server": { "type": "local", "command": ["bun", "run", "packages/opencode/test/mcp/fixtures/ui-server.ts"] } }
+b. cd packages/opencode && bun dev serve
+c. cd packages/app && bun dev:web
+d. 会话中让模型调用 show_dashboard
+e. 验证：时间线出现 iframe App；App 内按钮可触发 tools/list（Network 面板见 /api/mcp/ui-server/rpc）；进度条更新；折叠/展开正常；刷新页面后历史 part 的 App 仍可渲染
+```
+
 - [ ] a. 配置 ui-server
 - [ ] b/c. 启动 serve + web
 - [ ] d. 触发工具调用
