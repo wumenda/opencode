@@ -566,9 +566,7 @@ export function SessionSidePanel(props: {
                                 id={reviewTabID}
                                 aria-controls={activeTab() === "review" ? reviewTabPanelID : undefined}
                               >
-                                {props.hasReview()
-                                  ? language.t("session.review.filesChanged", { count: props.reviewCount() })
-                                  : language.t("session.tab.review")}
+                                {language.t("mcp.app.panel.title")}
                               </Tabs.Trigger>
                             </Show>
                             <Show when={contextOpen()}>
