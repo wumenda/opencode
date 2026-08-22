@@ -432,6 +432,9 @@ export const dict = {
   "mcp.app.needsAuth": "MCP 伺服器需要驗證",
   "mcp.app.connectFailed": "MCP 伺服器連線失敗",
   "mcp.app.connectTimeout": "MCP 伺服器連線逾時",
+  "mcp.app.panel.empty": "沒有可用的 MCP 應用程式",
+  "mcp.app.panel.title": "應用程式",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
   "mcp.status.disabled": "已停用",
 
   "dialog.fork.empty": "沒有可用於分支的訊息",

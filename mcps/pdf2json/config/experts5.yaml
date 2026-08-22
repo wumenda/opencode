@@ -1,0 +1,120 @@
+
+equipment:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: low
+
+boundary_node:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 3072
+  prompt_version: v1
+  reasoning_effort: medium
+
+plant_unit:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v2
+  inject_image_size: true
+  reasoning_effort: xhigh
+
+plant_unit_topology:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v1
+  enable_image_annotation: false
+  enable_preprocessing: false
+  inject_image_size: true
+  reasoning_effort: high
+
+plant_unit_topology_one_by_one:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v1
+  enable_image_annotation: false
+  enable_preprocessing: false
+  inject_image_size: true
+  reasoning_effort: high
+
+topology:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: high
+
+drawing_info:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: medium
+
+pfd_topology:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v2
+  reasoning_effort: high
+
+plant_unit_drawing_type:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: medium
+
+reactor_assembly:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 6000
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: high
+  thinking_type: auto
+
+column_assembly:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 6000
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: high
+  thinking_type: adaptive
+
+equipment_type:
+  provider: claude
+  model: claude-opus-4-6
+  image_size: 4096
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: medium
+
+process_description_topology:
+  provider: claude
+  model: claude-opus-4-6
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+
+process_package:
+  provider: claude
+  model: claude-opus-4-6
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+
+# 意图识别（text-only）：轻量文本分类，无需 thinking/reasoning。
+intent_recognition:
+  provider: claude
+  model: claude-opus-4-6
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: none
+  thinking_type: auto

@@ -83,6 +83,7 @@ test.describe("mcp app inline render", () => {
   test("keeps non-MCP tools on the plain tool card", async ({ page }) => {
     const toolID = "prt_mcp_plain"
     await setupTimeline(page, {
+      settings: { shellToolPartsExpanded: true },
       messages: [
         userMessage(),
         assistantMessage([

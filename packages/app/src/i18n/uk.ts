@@ -437,6 +437,9 @@ export const dict = {
   "mcp.app.needsAuth": "Сервер MCP вимагає автентифікації",
   "mcp.app.connectFailed": "Не вдалося підключитися до сервера MCP",
   "mcp.app.connectTimeout": "Час очікування підключення до сервера MCP вичерпано",
+  "mcp.app.panel.empty": "Немає доступних програм MCP",
+  "mcp.app.panel.title": "Додатки",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
 
   "dialog.fork.empty": "Немає повідомлень для відгалуження",
 

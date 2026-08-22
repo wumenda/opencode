@@ -436,6 +436,9 @@ export const dict = {
   "mcp.app.needsAuth": "Server MCP memerlukan autentikasi",
   "mcp.app.connectFailed": "Gagal terhubung ke server MCP",
   "mcp.app.connectTimeout": "Koneksi ke server MCP waktu habis",
+  "mcp.app.panel.empty": "Tidak ada aplikasi MCP yang tersedia",
+  "mcp.app.panel.title": "Aplikasi",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
 
   "dialog.fork.empty": "Tidak ada pesan yang dapat dicabangkan",
 

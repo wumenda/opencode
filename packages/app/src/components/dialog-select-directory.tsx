@@ -35,8 +35,9 @@ function toRow(absolute: string, home: string, group: Row["group"]): Row {
     return value + "/"
   }
 
+  const fwd = full.replaceAll("\\", "/")
   const search = Array.from(
-    new Set([full, withSlash(full), tilde, withSlash(tilde), getFilename(full)].filter(Boolean)),
+    new Set([full, withSlash(full), tilde, withSlash(tilde), fwd, withSlash(fwd), getFilename(full)].filter(Boolean)),
   ).join("\n")
   return { absolute: full, search, group }
 }

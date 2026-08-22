@@ -332,6 +332,9 @@ export const dict = {
   "mcp.app.needsAuth": "MCP-serveren kræver godkendelse",
   "mcp.app.connectFailed": "Kunne ikke oprette forbindelse til MCP-serveren",
   "mcp.app.connectTimeout": "Forbindelse til MCP-serveren fik timeout",
+  "mcp.app.panel.empty": "Ingen MCP-apps tilgængelige",
+  "mcp.app.panel.title": "Apps",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
   "mcp.status.disabled": "deaktiveret",
 
   "dialog.fork.empty": "Ingen beskeder at forgrene fra",

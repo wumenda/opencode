@@ -1,0 +1,81 @@
+﻿default: ark
+
+providers:
+
+  doubao:
+    name: Doubao
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    api_key: ${DOUBAO_API_KEY}
+    api_type: openai
+
+  siliconflow:
+    name: SiliconFlow
+    base_url: https://api.siliconflow.cn/v1
+    api_key: ${SILICONFLOW_API_KEY}
+    api_type: openai
+
+  cst9:
+    name: CST9 API
+    base_url: https://www.xmapi.cc/v1
+    api_key: ${CST9_API_KEY}
+    api_type: openai
+
+  ark:
+    name: Ark
+    base_url: https://ark.cn-beijing.volces.com/api/plan/v3
+    api_key: ${ARK_API_KEY}
+    api_type: openai
+
+  sensenova:
+    name: SenseNova
+    base_url: https://token.sensenova.cn/v1
+    api_key: ${SENSENOVA_API_KEY}
+    api_type: openai
+
+  openruter:
+    name: OpenRuter
+    base_url: https://openrouter.ai/api/v1
+    api_key: ${OPENRUTER_API_KEY}
+    api_type: openai
+
+  aliyun:
+    name: Aliyun
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key: ${ALIYUN_API_KEY}
+    api_type: openai
+
+  xiaomi:
+    name: Xiaomi
+    base_url: https://api.xiaomimimo.com/v1
+    api_key: ${XIAOMI_API_KEY}
+    api_type: openai
+
+  supcon:
+    name: Supcon
+    base_url: http://10.16.11.21:50088/v1
+    api_key: ${XIAOMI_API_KEY}
+    api_type: openai
+
+  anthropic:
+    name: Anthropic
+    base_url: https://www.xmapi.cc/v1
+    api_key: ${ANTHROPIC_API_KEY}
+    api_type: openai
+
+  gemini:
+    name: Google Gemini
+    base_url: https://generativelanguage.googleapis.com
+    api_key: ${GEMINI_API_KEY}
+    api_type: gemini
+
+  trae:
+    name: Trae
+    base_url: http://localhost:8082/v1
+    api_key: ${ANTHROPIC_API_KEY}
+    api_type: openai
+
+  agentplan:
+    name: AgentPlan
+    base_url: https://ark.cn-beijing.volces.com/api/plan/v3
+    api_key: ${AGENTPLAN_API_KEY}
+    api_type: openai

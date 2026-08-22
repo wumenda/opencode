@@ -436,6 +436,9 @@ export const dict = {
   "mcp.app.needsAuth": "El servidor MCP requiere autenticación",
   "mcp.app.connectFailed": "No se pudo conectar al servidor MCP",
   "mcp.app.connectTimeout": "Se agotó el tiempo de conexión al servidor MCP",
+  "mcp.app.panel.empty": "No hay aplicaciones MCP disponibles",
+  "mcp.app.panel.title": "Aplicaciones",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
   "mcp.status.disabled": "deshabilitado",
 
   "dialog.fork.empty": "No hay mensajes desde donde bifurcar",

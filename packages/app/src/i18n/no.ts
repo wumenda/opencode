@@ -425,6 +425,9 @@ export const dict = {
   "mcp.app.needsAuth": "MCP-serveren krever autentisering",
   "mcp.app.connectFailed": "Kunne ikke koble til MCP-serveren",
   "mcp.app.connectTimeout": "Tidsavbrudd for tilkobling til MCP-serveren",
+  "mcp.app.panel.empty": "Ingen MCP-apper tilgjengelig",
+  "mcp.app.panel.title": "Apper",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
   "mcp.status.disabled": "deaktivert",
 
   "dialog.fork.empty": "Ingen meldinger å forgrene fra",

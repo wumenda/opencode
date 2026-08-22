@@ -435,6 +435,9 @@ export const dict = {
   "mcp.app.needsAuth": "MCP server zahtijeva autentifikaciju",
   "mcp.app.connectFailed": "Povezivanje sa MCP serverom nije uspjelo",
   "mcp.app.connectTimeout": "Isteklo je vrijeme za povezivanje sa MCP serverom",
+  "mcp.app.panel.empty": "Nema dostupnih MCP aplikacija",
+  "mcp.app.panel.title": "Aplikacije",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
   "mcp.status.disabled": "onemogućeno",
 
   "dialog.fork.empty": "Nema poruka za fork",

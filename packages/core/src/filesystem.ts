@@ -7,8 +7,8 @@ import { FSUtil } from "./fs-util"
 import { Location } from "./location"
 import { PositiveInt, RelativePath } from "./schema"
 import { FileSystemSearch } from "./filesystem/search"
-import { Entry, FileSystem, FindInput, Match } from "@opencode-ai/schema/filesystem"
-export { Entry, Match, Submatch } from "@opencode-ai/schema/filesystem"
+import { Entry, FileSystem, FindInput, Match, WriteInput } from "@opencode-ai/schema/filesystem"
+export { Entry, Match, Submatch, WriteInput } from "@opencode-ai/schema/filesystem"
 
 export const ReadInput = Schema.Struct({
   path: RelativePath,
@@ -48,6 +48,7 @@ export const Event = FileSystem.Event
 
 export interface Interface {
   readonly read: (input: ReadInput) => Effect.Effect<{ readonly content: Uint8Array; readonly mime: string }>
+  readonly write: (input: WriteInput) => Effect.Effect<void>
   readonly list: (input?: ListInput) => Effect.Effect<Entry[]>
   readonly find: (input: FindInput) => Effect.Effect<Entry[]>
   readonly glob: (input: GlobInput) => Effect.Effect<readonly Entry[]>
@@ -71,6 +72,22 @@ const baseLayer = Layer.effect(
       if (!FSUtil.contains(root, real)) return yield* Effect.die(new Error("Path escapes the location"))
       return { absolute, real, directory: location.directory, root }
     })
+    // The write target may not exist yet, so realPath it by walking up to the deepest
+    // existing ancestor. That ancestor's real path is the symlink-escape guard.
+    const resolveWrite = Effect.fnUntraced(function* (input: RelativePath) {
+      const absolute = path.resolve(location.directory, input)
+      if (!FSUtil.contains(location.directory, absolute))
+        return yield* Effect.die(new Error("Path escapes the location"))
+      let ancestor = absolute
+      while (!(yield* fs.exists(ancestor).pipe(Effect.orDie))) {
+        const parent = path.dirname(ancestor)
+        if (parent === ancestor) return yield* Effect.die(new Error("Path escapes the location"))
+        ancestor = parent
+      }
+      const real = yield* fs.realPath(ancestor).pipe(Effect.orDie)
+      if (!FSUtil.contains(root, real)) return yield* Effect.die(new Error("Path escapes the location"))
+      return { absolute, real: absolute, directory: location.directory, root }
+    })
     return Service.of({
       find: search.find,
       glob: search.glob,
@@ -83,6 +100,12 @@ const baseLayer = Layer.effect(
           content: yield* fs.readFile(target.real).pipe(Effect.orDie),
           mime: FSUtil.mimeType(target.real),
         }
+      }),
+      write: Effect.fn("FileSystem.write")(function* (input) {
+        const target = yield* resolveWrite(input.path)
+        const content =
+          input.encoding === "base64" ? Buffer.from(input.content, "base64") : input.content
+        yield* fs.writeWithDirs(target.absolute, content).pipe(Effect.orDie)
       }),
       list: Effect.fn("FileSystem.list")(function* (input = {}) {
         const target = yield* resolve(input.path)

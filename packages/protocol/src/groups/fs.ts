@@ -17,6 +17,13 @@ const FindQuery = Schema.Struct({
   limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt), Schema.optional),
 })
 
+const FileContent = Schema.Struct({
+  name: Schema.String,
+  content: Schema.String,
+  encoding: Schema.Literals(["utf8", "base64"]),
+  mime: Schema.String,
+})
+
 export const FileSystemGroup = HttpApiGroup.make("server.fs")
   .add(
     HttpApiEndpoint.get("fs.read", "/api/fs/read/*", {
@@ -57,6 +64,35 @@ export const FileSystemGroup = HttpApiGroup.make("server.fs")
           identifier: "v2.fs.find",
           summary: "Find files",
           description: "Find recursively ranked filesystem entries relative to the requested location.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.get("fs.getFile", "/api/fs/get/*", {
+      query: LocationQuery,
+      success: Location.response(FileContent),
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "v2.fs.getFile",
+          summary: "Get file",
+          description: "Read one file relative to the requested location as utf8 or base64 content.",
+        }),
+      ),
+  )
+  .add(
+    HttpApiEndpoint.put("fs.saveFile", "/api/fs/save/*", {
+      query: LocationQuery,
+      payload: FileSystem.WriteInput,
+      success: HttpApiSchema.NoContent,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "v2.fs.saveFile",
+          summary: "Save file",
+          description: "Write text or binary content to one path relative to the requested location.",
         }),
       ),
   )

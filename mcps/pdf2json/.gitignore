@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+/build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+data/
+thinking_output/
+output_images/
+output/
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+.ruff_cache
+.uploads/
+.mypy_cache/
+.uv-cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.trae/
+
+# Project
+output_images/
+output/
+test_output/
+thinking_output/
+test_results/
+ppt*/
+.omx/
+data/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+services/web/results/
+services/web/uploads/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+log/
+logs/
+
+# Claude Code
+.claude/
+.worktrees/
+node_modules/
+
+# CodeGraph
+.codegraph/

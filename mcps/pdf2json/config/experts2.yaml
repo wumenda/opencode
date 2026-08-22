@@ -1,0 +1,152 @@
+
+equipment:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: medium
+  thinking_type: enabled
+  inject_image_size: false
+
+boundary_node:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: medium
+  thinking_type: enabled
+  inject_image_size: false
+
+drawing_info:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: medium
+  thinking_type: enabled
+  inject_image_size: false
+
+topology:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v2
+  reasoning_effort: high
+  thinking_type: enabled
+
+pfd_topology:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v2
+  reasoning_effort: high
+  thinking_type: enabled
+
+plant_unit:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v2
+  inject_image_size: true
+  reasoning_effort: medium
+  thinking_type: enabled
+
+plant_unit_topology:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  enable_image_annotation: false
+  enable_preprocessing: false
+  inject_image_size: true
+  reasoning_effort: high
+
+plant_unit_topology_one_by_one:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  enable_image_annotation: false
+  enable_preprocessing: false
+  inject_image_size: true
+  reasoning_effort: minimal
+  thinking_type: enabled
+
+reactor_assembly:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 6000
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: high
+  thinking_type: enabled
+
+column_assembly:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 6000
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: high
+  thinking_type: enabled
+
+plant_unit_drawing_type:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: medium
+  thinking_type: enabled
+
+equipment_type:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: medium
+  thinking_type: enabled
+
+process_description_topology:
+  provider: agentplan
+  model: doubao-seed-evolving
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+  thinking_type: enabled
+
+process_package:
+  provider: agentplan
+  model: doubao-seed-evolving
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+  thinking_type: enabled
+
+intent_recognition:
+  provider: agentplan
+  model: doubao-seed-evolving
+  prompt_version: v1
+  image_size: 4096
+  enable_preprocessing: false
+  reasoning_effort: none
+  thinking_type: auto
+
+composition_table:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+  thinking_type: enabled
+
+pfd_reflux:
+  provider: agentplan
+  model: doubao-seed-evolving
+  image_size: 4096
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+  thinking_type: enabled

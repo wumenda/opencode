@@ -1,0 +1,161 @@
+
+equipment:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: medium
+  thinking_type: enabled
+  inject_image_size: false
+
+boundary_node:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: medium
+  thinking_type: enabled
+  inject_image_size: false
+
+drawing_info:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  reasoning_effort: medium
+  thinking_type: enabled
+  inject_image_size: false
+
+topology:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v2
+  reasoning_effort: high
+  thinking_type: enabled
+
+pfd_topology:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v2
+  reasoning_effort: high
+  thinking_type: enabled
+
+plant_unit:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v2
+  inject_image_size: true
+  reasoning_effort: medium
+  thinking_type: enabled
+
+plant_unit_topology:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  enable_image_annotation: false
+  enable_preprocessing: false
+  inject_image_size: true
+  reasoning_effort: high
+
+plant_unit_topology_one_by_one:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  enable_image_annotation: false
+  enable_preprocessing: false
+  inject_image_size: true
+  reasoning_effort: minimal
+  thinking_type: enabled
+
+plant_unit_drawing_type:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: medium
+  thinking_type: enabled
+
+reactor_assembly:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 6000
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: high
+  thinking_type: enabled
+
+column_assembly:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 6000
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: high
+  thinking_type: enabled
+
+equipment_type:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  inject_image_size: true
+  reasoning_effort: medium
+  thinking_type: enabled
+
+process_description_topology:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+  thinking_type: enabled
+
+process_package:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: high
+  thinking_type: enabled
+
+# 组分表信息提取（图像输入）：识别图片中的组分表/物料平衡表，
+# 输出 components（组分定义）+ streams（物流组成）结构化 JSON。
+composition_table:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  enable_preprocessing: false
+  inject_image_size: false
+  reasoning_effort: medium
+  thinking_type: enabled
+
+# 意图识别（text-only）：轻量文本分类，无需 thinking/reasoning。
+# thinking_type=auto + reasoning_effort=none → 不发送 thinking 参数，
+# 避免全局 adaptive 设置被 doubao 等 provider 拒绝。
+intent_recognition:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  prompt_version: v1
+  enable_preprocessing: false
+  reasoning_effort: none
+  thinking_type: auto
+
+# PFD 塔与反应器回流结构分析（图像输入）：识别图中所有塔与反应器，
+# 判断回流结构，提取塔顶冷凝器/塔釜再沸器/回流量与设备操作条件。
+pfd_reflux:
+  provider: doubao
+  model: doubao-seed-2-1-pro-260628
+  image_size: 4096
+  prompt_version: v1
+  enable_preprocessing: false
+  inject_image_size: false
+  reasoning_effort: high
+  thinking_type: enabled
+

@@ -98,7 +98,7 @@ export const ExperimentalPaths = {
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
   sessionBackground: "/experimental/session/:sessionID/background",
-  resource: "/experimental/resource",
+  resource: "/api/mcp/resource",
 } as const
 
 export const ExperimentalApi = HttpApi.make("experimental")

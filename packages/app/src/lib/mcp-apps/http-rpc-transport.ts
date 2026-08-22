@@ -48,7 +48,7 @@ export class HttpRpcTransport implements Transport {
     const url = new URL(`/api/mcp/${encodeURIComponent(options.server)}/rpc`, options.baseUrl)
     if (options.directory) url.searchParams.set("directory", options.directory)
     this.url = url.toString()
-    this.fetchFn = options.fetchFn ?? globalThis.fetch
+    this.fetchFn = (options.fetchFn ?? globalThis.fetch).bind(globalThis)
     this.headers = { "content-type": "application/json", ...options.headers }
   }
 

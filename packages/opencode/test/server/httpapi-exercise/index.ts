@@ -371,12 +371,12 @@ const scenarios: Scenario[] = [
         }),
       "status",
     ),
-  http.protected.get("/mcp", "mcp.status").json(),
+  http.protected.get("/api/mcp", "mcp.status").json(),
   http.protected
-    .post("/mcp", "mcp.add")
+    .post("/api/mcp", "mcp.add")
     .mutating()
     .at((ctx) => ({
-      path: "/mcp",
+      path: "/api/mcp",
       headers: ctx.headers(),
       body: { name: "httpapi-disabled", config: { type: "local", command: ["bun", "--version"], enabled: false } },
     }))
@@ -390,46 +390,46 @@ const scenarios: Scenario[] = [
       "status",
     ),
   http.protected
-    .post("/mcp", "mcp.add.invalid")
+    .post("/api/mcp", "mcp.add.invalid")
     .at((ctx) => ({
-      path: "/mcp",
+      path: "/api/mcp",
       headers: ctx.headers(),
       body: { name: "httpapi-invalid", config: { type: "invalid" } },
     }))
     .status(400),
   http.protected
-    .post("/mcp/{name}/auth", "mcp.auth.start")
-    .at((ctx) => ({ path: route("/mcp/{name}/auth", { name: "httpapi-missing" }), headers: ctx.headers() }))
+    .post("/api/mcp/{name}/auth", "mcp.auth.start")
+    .at((ctx) => ({ path: route("/api/mcp/{name}/auth", { name: "httpapi-missing" }), headers: ctx.headers() }))
     .json(404, object, "status"),
   http.protected
-    .delete("/mcp/{name}/auth", "mcp.auth.remove")
+    .delete("/api/mcp/{name}/auth", "mcp.auth.remove")
     .mutating()
-    .at((ctx) => ({ path: route("/mcp/{name}/auth", { name: "httpapi-missing" }), headers: ctx.headers() }))
+    .at((ctx) => ({ path: route("/api/mcp/{name}/auth", { name: "httpapi-missing" }), headers: ctx.headers() }))
     .json(404, object, "status"),
   http.protected
-    .post("/mcp/{name}/auth/authenticate", "mcp.auth.authenticate")
+    .post("/api/mcp/{name}/auth/authenticate", "mcp.auth.authenticate")
     .at((ctx) => ({
-      path: route("/mcp/{name}/auth/authenticate", { name: "httpapi-missing" }),
+      path: route("/api/mcp/{name}/auth/authenticate", { name: "httpapi-missing" }),
       headers: ctx.headers(),
     }))
     .json(404, object, "status"),
   http.protected
-    .post("/mcp/{name}/auth/callback", "mcp.auth.callback")
+    .post("/api/mcp/{name}/auth/callback", "mcp.auth.callback")
     .at((ctx) => ({
-      path: route("/mcp/{name}/auth/callback", { name: "httpapi-missing" }),
+      path: route("/api/mcp/{name}/auth/callback", { name: "httpapi-missing" }),
       headers: ctx.headers(),
       body: { code: "code" },
     }))
     .json(404, object, "status"),
   http.protected
-    .post("/mcp/{name}/connect", "mcp.connect")
+    .post("/api/mcp/{name}/connect", "mcp.connect")
     .mutating()
-    .at((ctx) => ({ path: route("/mcp/{name}/connect", { name: "httpapi-missing" }), headers: ctx.headers() }))
+    .at((ctx) => ({ path: route("/api/mcp/{name}/connect", { name: "httpapi-missing" }), headers: ctx.headers() }))
     .json(404, object, "status"),
   http.protected
-    .post("/mcp/{name}/disconnect", "mcp.disconnect")
+    .post("/api/mcp/{name}/disconnect", "mcp.disconnect")
     .mutating()
-    .at((ctx) => ({ path: route("/mcp/{name}/disconnect", { name: "httpapi-missing" }), headers: ctx.headers() }))
+    .at((ctx) => ({ path: route("/api/mcp/{name}/disconnect", { name: "httpapi-missing" }), headers: ctx.headers() }))
     .json(404, object, "status"),
   http.protected.get("/pty/shells", "pty.shells").json(200, array),
   http.protected.get("/pty", "pty.list").json(200, array),
@@ -593,7 +593,7 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(body === false, "background route should be a no-op without running subagents")
     }),
-  http.protected.get("/experimental/resource", "experimental.resource.list").json(),
+  http.protected.get("/api/mcp/resource", "experimental.resource.list").json(),
   http.protected
     .post("/sync/history", "sync.history.list")
     .at((ctx) => ({ path: "/sync/history", headers: ctx.headers(), body: {} }))

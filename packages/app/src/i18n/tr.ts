@@ -439,6 +439,9 @@ export const dict = {
   "mcp.app.needsAuth": "MCP sunucusu kimlik doğrulaması gerektiriyor",
   "mcp.app.connectFailed": "MCP sunucusuna bağlanılamadı",
   "mcp.app.connectTimeout": "MCP sunucusu bağlantısı zaman aşımına uğradı",
+  "mcp.app.panel.empty": "Kullanılabilir MCP uygulaması yok",
+  "mcp.app.panel.title": "Uygulamalar",
+  "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
   "mcp.status.disabled": "devre dışı",
 
   "dialog.fork.empty": "Dallandırılacak mesaj yok",

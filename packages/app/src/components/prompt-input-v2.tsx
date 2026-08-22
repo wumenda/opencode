@@ -261,7 +261,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         url: resource.uri,
         source: {
           type: "resource" as const,
-          text: { value: `@${resource.name}`, start: 0, end: resource.name.length + 1 },
+          text: { value: `@${resource.name}`, start: 0, end: (resource.name ?? "").length + 1 },
           clientName: resource.server,
           uri: resource.uri,
         },

@@ -38,3 +38,10 @@ export class FindInput extends Schema.Class<FindInput>("FileSystem.FindInput")({
   type: Schema.Literals(["file", "directory"]).pipe(optional),
   limit: PositiveInt.pipe(optional),
 }) {}
+
+export interface WriteInput extends Schema.Schema.Type<typeof WriteInput> {}
+export const WriteInput = Schema.Struct({
+  path: RelativePath,
+  content: Schema.String,
+  encoding: Schema.Literals(["utf8", "base64"]).pipe(optional),
+}).annotate({ identifier: "FileSystem.WriteInput" })

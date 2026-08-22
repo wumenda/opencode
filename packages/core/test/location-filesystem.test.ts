@@ -66,4 +66,65 @@ describe("FileSystem", () => {
       }).pipe(provide(directory)),
     ),
   )
+
+  it.live("writes text content as utf8", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const service = yield* FileSystem.Service
+        yield* service.write({ path: RelativePath.make("out.txt"), content: "hello", encoding: "utf8" })
+        const file = yield* service.read({ path: RelativePath.make("out.txt") })
+        expect(new TextDecoder().decode(file.content)).toBe("hello")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("writes binary content from base64", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const service = yield* FileSystem.Service
+        const bytes = new Uint8Array([0x00, 0x01, 0x02, 0x03])
+        yield* service.write({
+          path: RelativePath.make("data.bin"),
+          content: Buffer.from(bytes).toString("base64"),
+          encoding: "base64",
+        })
+        const file = yield* service.read({ path: RelativePath.make("data.bin") })
+        expect(file.content).toEqual(bytes)
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("creates missing parent directories", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const service = yield* FileSystem.Service
+        yield* service.write({ path: RelativePath.make("a/b/c.txt"), content: "x" })
+        const file = yield* service.read({ path: RelativePath.make("a/b/c.txt") })
+        expect(new TextDecoder().decode(file.content)).toBe("x")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("overwrites existing files", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const service = yield* FileSystem.Service
+        yield* service.write({ path: RelativePath.make("out.txt"), content: "one" })
+        yield* service.write({ path: RelativePath.make("out.txt"), content: "two" })
+        const file = yield* service.read({ path: RelativePath.make("out.txt") })
+        expect(new TextDecoder().decode(file.content)).toBe("two")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("rejects writes escaping the location", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const result = yield* (yield* FileSystem.Service)
+          .write({ path: RelativePath.make("../outside.txt"), content: "x" })
+          .pipe(Effect.exit)
+        expect(Exit.isFailure(result)).toBe(true)
+      }).pipe(provide(directory)),
+    ),
+  )
 })

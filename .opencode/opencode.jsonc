@@ -13,7 +13,8 @@
     },
   },
   "mcp": {
-    "ui-server": { "type": "local", "command": ["bun", "run", "packages/opencode/test/mcp/fixtures/ui-server.ts"] }
+    "ui-server": { "type": "local", "command": ["bun", "run", "packages/opencode/test/mcp/fixtures/ui-server.ts"] },
+    "remote-server": { "type": "remote", "url": "http://localhost:8000/mcp" }
   },
   "tools": {
     "github-triage": false,

@@ -76,17 +76,37 @@ server.setRequestHandler(ListToolsRequestSchema, () =>
   }),
 )
 
-server.setRequestHandler(CallToolRequestSchema, (request) => {
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name !== "show_dashboard") {
-    return Promise.resolve({
+    return {
       content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }],
       isError: true,
-    })
+    }
   }
-  return Promise.resolve({
+  // Stream progress notifications through the host, which maps them onto the
+  // running tool part's `metadata.mcpProgress` for the timeline progress UI.
+  const progressToken = request.params._meta?.progressToken
+  const steps = 5
+  for (let step = 1; step <= steps; step++) {
+    if (progressToken !== undefined) {
+      await server.notification({
+        method: "notifications/progress",
+        params: {
+          progressToken,
+          progress: step,
+          total: steps,
+          message: `Rendering dashboard ${step}/${steps}`,
+        },
+      })
+    }
+    await sleep(1200)
+  }
+  return {
     content: [{ type: "text", text: "Dashboard rendered." }],
     _meta: { ui: { resourceUri: DASHBOARD_URI } },
-  })
+  }
 })
 
 server.setRequestHandler(ListResourcesRequestSchema, () =>

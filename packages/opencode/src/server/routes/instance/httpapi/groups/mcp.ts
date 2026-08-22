@@ -39,13 +39,13 @@ export const RpcPayload = Schema.Struct({
 })
 
 export const McpPaths = {
-  status: "/mcp",
-  auth: "/mcp/:name/auth",
-  authCallback: "/mcp/:name/auth/callback",
-  authAuthenticate: "/mcp/:name/auth/authenticate",
-  connect: "/mcp/:name/connect",
-  disconnect: "/mcp/:name/disconnect",
-  rpc: "/mcp/:name/rpc",
+  status: "/api/mcp",
+  auth: "/api/mcp/:name/auth",
+  authCallback: "/api/mcp/:name/auth/callback",
+  authAuthenticate: "/api/mcp/:name/auth/authenticate",
+  connect: "/api/mcp/:name/connect",
+  disconnect: "/api/mcp/:name/disconnect",
+  rpc: "/api/mcp/:name/rpc",
 } as const
 
 export const McpApi = HttpApi.make("mcp")
