@@ -21,7 +21,7 @@ export function buildHostContext(input: {
     displayMode: "inline",
     containerDimensions: dims,
     locale: input.locale,
-    timeZone: input.timeZone,
+    timeZone: input.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     platform: "web",
     deviceCapabilities: { touch: false, hover: true },
   }

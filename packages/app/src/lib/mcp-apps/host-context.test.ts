@@ -14,3 +14,9 @@ test("omits dimensions when missing", () => {
   const ctx = buildHostContext({})
   expect(ctx.containerDimensions).toBeUndefined()
 })
+
+test("defaults timeZone to the local timezone when not provided", () => {
+  const ctx = buildHostContext({ theme: "dark" })
+  expect(ctx.theme).toBe("dark")
+  expect(ctx.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone)
+})

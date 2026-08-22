@@ -27,6 +27,8 @@ export type McpAppViewProps = {
   onError?: (message: string) => void
   /** 填满父容器高度（用于面板模式），默认 false 使用固定 h-80。 */
   fillHeight?: boolean
+  /** 传入 hostContext 的主题，透传给 MCP App（沿用宿主侧明暗主题）。 */
+  theme?: "light" | "dark"
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -170,6 +172,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       width: iframe.clientWidth || undefined,
       height: iframe.clientHeight || undefined,
       locale: language.intl(), // 取自 useLanguage() 的 BCP-47 locale tag
+      theme: props.theme,
     })
     const next = new AppBridge(
       client,
