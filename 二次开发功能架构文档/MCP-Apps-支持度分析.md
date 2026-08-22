@@ -4,7 +4,7 @@
 > "Host" 指 opencode 后端（`packages/opencode`，httpapi 的 `/api/mcp/:name/rpc` relay）；"Web" 指前端（`packages/app`，`McpAppView` / `AppBridge`；以及 `packages/session-ui` 的 `mcp-tool.tsx`）。
 > 本版本为逐文件核对源码后的**当前实态**，取代早期基于印象的旧版结论——旧版标注的多项"未实现"（openLink、hostContext、blob/PDF 资源、资源 csp/permissions、sampling relay、teardown/message/updateModelContext、size-change）现已落地。
 
-**结论先行：核心能力已基本完整，但**仍未"完全支持所有特性"**。核心渲染 + AppBridge 双向桥接 + 核心工具/资源/提示代理 + 结果回放 + 进度 + 打开外链 + 自动尺寸 + 运行中流式 push（tool-input-partial / tool-result）+ 二进制 blob 渲染 + `ui/message` 上屏 + `ui/open-link` + `ui/download-file` + 优雅 teardown + hostContext（主题/时区/locale/尺寸）均已落地并可直接支持常见演示 App；仍缺失或占位：sampling 的宿主侧真实 LLM 实现（capability 未声明）、`ui/update-model-context` 仅日志、camera/mic/geolocation 权限、hostContext 的实时 `setHostContext` 订阅、以及 E2E 需在具备 Playwright 浏览器的环境下跑通。**
+**结论先行：核心能力已基本完整，但**仍未"完全支持所有特性"**。核心渲染 + AppBridge 双向桥接 + 核心工具/资源/提示代理 + 结果回放 + 进度 + 打开外链 + 自动尺寸 + 运行中流式 push（tool-input-partial / tool-result）+ 二进制 blob 渲染 + `ui/message` 上屏 + `ui/open-link` + `ui/download-file` + 优雅 teardown + hostContext（主题/时区/locale/尺寸）均已落地并可直接支持常见演示 App；仍缺失或占位：sampling 的宿主侧真实 LLM 实现（capability 未声明）、`ui/update-model-context` 仅日志、camera/mic/geolocation 权限、hostContext 的实时 `setHostContext` 订阅。**E2E 已在本机安装 Playwright 后跑通（mcp-app / mcp-progress 相关 spec 全绿）。**
 
 ---
 
@@ -157,7 +157,7 @@ Host 侧核心代理源：
 2. **hostContext 实时订阅**：接入宿主 `setHostContext`（如主题/容器尺寸变化时推送 `host-context-changed`），依赖引入现成 `useTheme` 类钩子。
 3. **`ui/update-model-context` 落地**：把 App 提交的上下文并入下一轮模型请求。
 4. **权限补全**：camera/mic/geolocation 在宿主授权策略就绪后透传 `allow-*`；`tool-cancelled` 运行中推送。
-5. **E2E 实测**：在具备 Playwright 浏览器的环境中运行新增用例（当前因浏览器缺失未执行）。
+5. **E2E 实测**：已在本机安装 Playwright 后跑通（mcp-app / mcp-progress spec 全绿）。后续 CI 需预装浏览器。
 6. **契约对齐**：逐步用新版 `@opencode-ai/client` 替代前端 workaround（双形状 / 204 / fetch-bind），把 relay 从补丁态收敛到规范对齐态。
 
 > 附注：剩余"未实现/占位"均可基于已接入的 ext-apps `AppBridge` 增量补齐，无需重写基础设施。
