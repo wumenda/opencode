@@ -5,6 +5,7 @@ export type SandboxOptions = {
     connectDomains?: string[]
     resourceDomains?: string[]
     frameDomains?: string[]
+    scriptDomains?: string[]
   }
   permissions?: {
     clipboardWrite?: unknown
@@ -47,7 +48,7 @@ export async function readUiResource(client: Client, uri: string): Promise<UiRes
 export function injectCsp(html: string, csp?: SandboxOptions["csp"]): string {
   const base = [
     "default-src 'none'",
-    "script-src 'unsafe-inline' 'self' data:",
+    `script-src 'unsafe-inline' 'self' data: ${csp?.scriptDomains?.join(" ") || ""}`.trim(),
     "style-src 'unsafe-inline'",
     "img-src data: blob:",
     `connect-src ${[...(csp?.connectDomains ?? []), ...(csp?.resourceDomains ?? [])].join(" ") || "'none'"}`,

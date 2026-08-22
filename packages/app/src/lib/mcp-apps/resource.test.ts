@@ -95,6 +95,13 @@ describe("injectCsp", () => {
     expect(html).toContain("script-src 'unsafe-inline'")
   })
 
+  test("adds scriptDomains to script-src", () => {
+    const html = injectCsp("<html><head></head><body></body></html>", {
+      scriptDomains: ["https://cdn.example.com"],
+    })
+    expect(html).toContain("script-src 'unsafe-inline' 'self' data: https://cdn.example.com")
+  })
+
   test("keeps head attributes when injecting", () => {
     const html = injectCsp('<html><head lang="en"><title>t</title></head></html>')
     expect(html).toContain('<head lang="en"><meta http-equiv="Content-Security-Policy"')
