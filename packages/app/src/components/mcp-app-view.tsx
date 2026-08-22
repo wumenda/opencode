@@ -8,7 +8,10 @@ import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
 import { useServerSDK } from "@/context/server-sdk"
 import { HttpRpcTransport } from "@/lib/mcp-apps/http-rpc-transport"
+import { hostCapabilities } from "@/lib/mcp-apps/bridge"
+import { buildHostContext } from "@/lib/mcp-apps/host-context"
 import { buildSandboxedHtml, readUiResource } from "@/lib/mcp-apps/resource"
+import { mcpServerStatus } from "@/lib/mcp-apps/mcp-status"
 import { authTokenFromCredentials } from "@/utils/server"
 
 const CONNECT_TIMEOUT_MS = 30_000
@@ -41,6 +44,8 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   const [phase, setPhase] = createSignal<"loading" | "ready" | "error">("loading")
   const [errorMessage, setErrorMessage] = createSignal("")
   const [blobUrl, setBlobUrl] = createSignal<string>()
+  const [sandbox, setSandbox] = createSignal("allow-scripts")
+  const [autoHeight, setAutoHeight] = createSignal<number>()
 
   let client: Client | undefined
   let bridge: AppBridge | undefined
@@ -52,6 +57,12 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     void client?.close()
     revoke?.()
   })
+
+  // 命令式入口：宿主在工具运行期向其推送部分输入。bridge 在 onIframeLoad 成功后才
+  // 就绪；未就绪时为 no-op（幂等）。供后续"后端运行中 -> App"流式触发源复用。
+  const pushToolInput = (partial: Record<string, unknown>) => {
+    void bridge?.sendToolInputPartial({ arguments: partial })
+  }
 
   async function start() {
     void bridge?.close()
@@ -81,9 +92,10 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       await next.connect(transport)
       client = next
       const html = await readUiResource(next, props.resourceUri)
-      const sandbox = buildSandboxedHtml(html)
+      const sandbox = buildSandboxedHtml(html.text ?? "", { csp: html.meta?.ui?.csp, permissions: html.meta?.ui?.permissions })
       revoke = sandbox.revoke
       setBlobUrl(sandbox.url)
+      setSandbox(sandbox.sandbox)
       setPhase("ready")
     } catch (error) {
       void next.close()
@@ -95,9 +107,26 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   }
 
   async function ensureConnected(directory: string) {
-    const api = serverSDK().currentApi
-    const status = async () =>
-      (await api.mcp.list({ location: { directory } })).data.find((entry) => entry.name === props.server)?.status.status
+    // The vendored client talks `location` query terms and expects 204 from connect,
+    // neither of which the deployed backend honours. Ping the same relay endpoints the
+    // RPC transport uses (keyed by `directory`) so we observe the actual workspace scope.
+    const http = serverSDK().server.http
+    const fetchFn = (platform.fetch ?? globalThis.fetch).bind(globalThis)
+    const headers = http.password
+      ? { authorization: `Basic ${authTokenFromCredentials({ username: http.username, password: http.password })}` }
+      : undefined
+    const status = async () => {
+      const target = new URL("/api/mcp", serverSDK().url)
+      if (directory) target.searchParams.set("directory", directory)
+      const response = await fetchFn(target, { headers })
+      if (!response.ok) return undefined
+      const payload = (await response.json()) as
+        | { data?: Array<{ name: string; status: { status?: string } }> }
+        | Record<string, { status?: string }>
+      // `/api/mcp` may answer an array `{ data: [{ name, status }] }` (E2E mock) or a
+      // record keyed by server name (deployed backend). Accept both.
+      return mcpServerStatus(payload, props.server)
+    }
 
     const current = await status()
     if (current === "connected") return
@@ -106,7 +135,9 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       throw new Error(language.t("mcp.app.needsAuth"))
     }
 
-    await api.mcp.connect({ server: props.server, location: { directory } })
+    const connectTarget = new URL(`/api/mcp/${encodeURIComponent(props.server)}/connect`, serverSDK().url)
+    if (directory) connectTarget.searchParams.set("directory", directory)
+    await fetchFn(connectTarget, { method: "POST", headers })
     const deadline = Date.now() + CONNECT_TIMEOUT_MS
     while (Date.now() < deadline) {
       await sleep(CONNECT_POLL_MS)
@@ -124,17 +155,50 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   // wired up only after the iframe finished loading the sandboxed document.
   async function onIframeLoad(iframe: HTMLIFrameElement) {
     if (!client || !iframe.contentWindow) return
-    const next = new AppBridge(client, { name: "opencode", version: "1.0.0" }, {
-      openLinks: {},
-      serverTools: {},
-      serverResources: {},
-      logging: {},
+    const hostContext = buildHostContext({
+      width: iframe.clientWidth || undefined,
+      height: iframe.clientHeight || undefined,
+      locale: language.intl(), // 取自 useLanguage() 的 BCP-47 locale tag
     })
+    const next = new AppBridge(
+      client,
+      { name: "opencode", version: "1.0.0" },
+      hostCapabilities({ openLink: true, downloadFile: false, message: true, logging: true }),
+      { hostContext },
+    )
     next.oninitialized = () => {
       if (props.fallbackData) void next.sendToolResult(props.fallbackData)
     }
+    next.onopenlink = async (params) => {
+      platform.openExternal(params.url)
+      return {}
+    }
+    next.onmessage = async (params) => {
+      console.log("[mcp-app] app message", params)
+      return {}
+    }
+    next.onupdatemodelcontext = async (params) => {
+      console.log("[mcp-app] update model context", params)
+      return {}
+    }
+    next.onrequestteardown = async () => {
+      void next.close()
+    }
+    next.onsizechange = (h: { width?: number; height?: number }) => {
+      if (h.height) setAutoHeight(h.height)
+    }
     try {
-      await next.connect(new PostMessageTransport(iframe.contentWindow, iframe.contentWindow))
+      const transport = new PostMessageTransport(iframe.contentWindow, iframe.contentWindow)
+      // Log host -> iframe `ui/notifications/*` dispatch (diagnostics only, no UI).
+      const baseSend = transport.send.bind(transport)
+      transport.send = async (message, options) => {
+        const method = (message as { method?: unknown } | undefined)?.method
+        if (typeof method === "string" && method.startsWith("ui/notifications/")) {
+          console.log(`[mcp-app] host -> app ${method}`, (message as { params?: unknown }).params)
+        }
+        return baseSend(message, options)
+      }
+      await next.connect(transport)
       bridge = next
     } catch (error) {
       void next.close()
@@ -177,9 +241,10 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       <Show when={blobUrl()}>
         <iframe
           src={blobUrl()}
-          sandbox="allow-scripts"
+          sandbox={sandbox()}
           class="w-full border-0 bg-v2-background-bg-layer-01"
-          classList={{ "h-80": !props.fillHeight, "flex-1": props.fillHeight }}
+          classList={{ "h-80": !props.fillHeight && !autoHeight(), "flex-1": props.fillHeight }}
+          style={autoHeight() ? { height: `${autoHeight()}px` } : undefined}
           onLoad={(event) => void onIframeLoad(event.currentTarget)}
         />
       </Show>
