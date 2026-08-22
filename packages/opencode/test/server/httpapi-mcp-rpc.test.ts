@@ -3,6 +3,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
 import {
   CallToolRequestSchema,
+  CreateMessageRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js"
@@ -57,6 +58,13 @@ const serve = Effect.acquireRelease(
     protocol.setRequestHandler(ReadResourceRequestSchema, () =>
       Promise.resolve({ contents: [{ uri: "ui://dashboard", text: "<html/>" }] }),
     )
+    protocol.setRequestHandler(CreateMessageRequestSchema, () =>
+      Promise.resolve({
+        model: "mock",
+        role: "assistant",
+        content: { type: "text", text: "sampling ok" },
+      }),
+    )
 
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID(),
@@ -82,7 +90,7 @@ const serve = Effect.acquireRelease(
 
 describe("mcp rpc endpoint", () => {
   it.instance(
-    "relays an MCP method to a connected server and returns 200 for known methods, 400 for unsupported, 404 for missing",
+    "relays MCP methods (tools, resources, sampling) to a connected server and returns 200 for known methods, 400 for unsupported, 404 for missing",
     () =>
       Effect.gen(function* () {
         const server = yield* serve
@@ -90,7 +98,7 @@ describe("mcp rpc endpoint", () => {
         const dir = tmp.directory
 
         // Add a remote server (auto-connects) so a client exists in mcp.clients().
-        const added = yield* request("/mcp", dir, {
+        const added = yield* request("/api/mcp", dir, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ name: "ui", config: { type: "remote", url: server.url } }),
@@ -98,7 +106,7 @@ describe("mcp rpc endpoint", () => {
         expect(added.status).toBe(200)
 
         // Known method → forwarded result.
-        const list = yield* request("/mcp/ui/rpc", dir, {
+        const list = yield* request("/api/mcp/ui/rpc", dir, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ method: "tools/list" }),
@@ -108,8 +116,27 @@ describe("mcp rpc endpoint", () => {
           tools: [{ name: "show_dashboard" }],
         })
 
+        // Sampling (client-initiated) method → forwarded result.
+        const sampling = yield* request("/api/mcp/ui/rpc", dir, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            method: "sampling/createMessage",
+            params: {
+              messages: [{ role: "user", content: { type: "text", text: "hi" } }],
+              maxTokens: 10,
+            },
+          }),
+        })
+        expect(sampling.status).toBe(200)
+        expect(yield* json(sampling)).toMatchObject({
+          model: "mock",
+          role: "assistant",
+          content: { type: "text", text: "sampling ok" },
+        })
+
         // Unsupported method → 400.
-        const unsupported = yield* request("/mcp/ui/rpc", dir, {
+        const unsupported = yield* request("/api/mcp/ui/rpc", dir, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ method: "resources/subscribe" }),
@@ -118,7 +145,7 @@ describe("mcp rpc endpoint", () => {
         expect(yield* json(unsupported)).toEqual({ message: "Unsupported MCP method: resources/subscribe" })
 
         // Missing server → 404.
-        const missing = yield* request("/mcp/nope/rpc", dir, {
+        const missing = yield* request("/api/mcp/nope/rpc", dir, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ method: "ping" }),

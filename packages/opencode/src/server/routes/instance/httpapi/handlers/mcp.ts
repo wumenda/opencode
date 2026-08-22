@@ -3,6 +3,8 @@ import type { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index
 import {
   LATEST_PROTOCOL_VERSION,
   type CallToolRequest,
+  type CreateMessageRequest,
+  CreateMessageResultSchema,
   type GetPromptRequest,
   type ListPromptsRequest,
   type ListResourceTemplatesRequest,
@@ -153,13 +155,19 @@ function rpcCall(
   const p = (params ?? {}) as Record<string, unknown>
   switch (method) {
     case "initialize":
-      return () =>
-        Promise.resolve({
+      return () => {
+        const instructions = client.getInstructions()
+        const base = {
           protocolVersion: LATEST_PROTOCOL_VERSION,
           capabilities: client.getServerCapabilities() ?? {},
           serverInfo: client.getServerVersion() ?? { name: "unknown", version: "0.0.0" },
-          instructions: client.getInstructions(),
-        })
+        }
+        // The relay's HttpApi encodes responses with Schema.Unknown, which cannot
+        // serialize `undefined`; omit instructions when the server did not provide it.
+        return instructions === undefined
+          ? Promise.resolve(base)
+          : Promise.resolve({ ...base, instructions })
+      }
     case "ping":
       return () => Promise.resolve({})
     case "tools/list":
@@ -176,6 +184,14 @@ function rpcCall(
       return () => client.listPrompts(p as ListPromptsRequest["params"])
     case "prompts/get":
       return () => client.getPrompt(p as GetPromptRequest["params"])
+    case "sampling/createMessage":
+      // The SDK Client exposes no high-level createMessage(); issue a raw
+      // request and validate the response against CreateMessageResultSchema.
+      return () =>
+        client.request(
+          { method: "sampling/createMessage", params: p as CreateMessageRequest["params"] },
+          CreateMessageResultSchema,
+        )
   }
   return undefined
 }
