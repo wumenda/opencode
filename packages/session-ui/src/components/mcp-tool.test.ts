@@ -52,8 +52,9 @@ describe("mcpAppFromPart", () => {
     })
   })
 
-  test("returns undefined for error status even with mcp metadata", () => {
-    expect(mcpAppFromPart(part({ status: "error", stateMetadata: { mcp: mcpMeta } }))).toBeUndefined()
+  test("returns app info for a cancelled (error) tool so it stays mounted", () => {
+    const info = mcpAppFromPart(part({ status: "error", stateMetadata: { mcp: { server: "ui", ui: { resourceUri: "ui://x" } } } }))
+    expect(info).toEqual({ server: "ui", resourceUri: "ui://x", fallbackData: undefined })
   })
 
   test("returns undefined without mcp metadata", () => {

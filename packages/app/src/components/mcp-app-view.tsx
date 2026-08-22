@@ -90,6 +90,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     if (!bridge) return
     if (event.type === "tool-input-partial") void bridge.sendToolInputPartial({ arguments: event.arguments })
     else if (event.type === "tool-result") void bridge.sendToolResult(event.result as CallToolResult)
+    else if (event.type === "tool-cancelled") void bridge.sendToolCancelled({ reason: event.reason })
   }
   const handleEvent: McpAppSink = (event) => {
     if (!bridge || !appInitialized) {

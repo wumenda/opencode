@@ -27,4 +27,13 @@ describe("createMcpAppHostRegistry", () => {
     reg.push("a/ui://x", { type: "tool-input-partial", arguments: {} })
     expect(received).toHaveLength(0)
   })
+
+  test("routes tool-cancelled to the registered sink", () => {
+    const reg = createMcpAppHostRegistry()
+    const received: McpAppEvent[] = []
+    const un = reg.register("a/ui://x", (e) => received.push(e))
+    reg.push("a/ui://x", { type: "tool-cancelled", reason: "canceled" })
+    expect(received).toEqual([{ type: "tool-cancelled", reason: "canceled" }])
+    un()
+  })
 })

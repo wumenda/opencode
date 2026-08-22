@@ -26,10 +26,10 @@ function toolMetadata(part: ToolPart) {
   return "metadata" in part.state ? part.state.metadata : undefined
 }
 
-/** Extracts the inline MCP App (SEP-1865) to render for a running or completed tool part, if any. */
+/** Extracts the inline MCP App (SEP-1865) to render for a running, completed, or cancelled (error) tool part, if any. */
 export function mcpAppFromPart(part: ToolPart): McpAppInfo | undefined {
-  // running 或 completed 才可能承载 ui:// App；error 等其它状态不允许渲染。
-  if (part.state.status !== "running" && part.state.status !== "completed") return
+  // running / completed / error 才可能承载 ui:// App；error（取消）需保持 App 挂载以便推送取消原因。
+  if (part.state.status !== "running" && part.state.status !== "completed" && part.state.status !== "error") return
   const mcp = record(toolMetadata(part)?.mcp)
   if (!mcp) return
   const server = mcp.server
@@ -95,6 +95,15 @@ export function McpTool(props: {
     const result = mcp?.result
     if (result === undefined) return
     host.push(`${info.server}/${info.resourceUri}`, { type: "tool-result", result: result as CallToolResult })
+  })
+
+  // 工具 error（取消）且已渲染 App 时，把取消原因推送给已挂载的 App，使其保持挂载并展示取消态。
+  createEffect(() => {
+    const info = app()
+    if (!info) return
+    if (props.part.state.status !== "error") return
+    const err = (props.part.state as { error?: string }).error
+    host.push(`${info.server}/${info.resourceUri}`, { type: "tool-cancelled", reason: err ?? "cancelled" })
   })
 
   const percent = createMemo(() => {

@@ -16,6 +16,7 @@ export type AppKey = string
 export type McpAppEvent =
   | { type: "tool-input-partial"; arguments: Record<string, unknown> }
   | { type: "tool-result"; result: CallToolResult }
+  | { type: "tool-cancelled"; reason: string }
 
 export type McpAppSink = (event: McpAppEvent) => void
 
