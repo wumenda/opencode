@@ -50,6 +50,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   const serverSDK = useServerSDK()
   const sdk = useSDK()
   const host = useMcpAppHost()
+  const modelCtx = useMcpModelContext()
   const themeCtx = useTheme()
   const resolvedTheme = createMemo(() => toMcpTheme(themeCtx.mode()))
 

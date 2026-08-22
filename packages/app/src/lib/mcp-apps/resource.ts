@@ -19,7 +19,7 @@ export type UiResourceContent = {
   text?: string
   blob?: string
   mimeType?: string
-  meta?: { ui?: { csp?: unknown; permissions?: unknown } }
+  meta?: { ui?: { csp?: SandboxOptions["csp"]; permissions?: SandboxOptions["permissions"] } }
 }
 
 const isBlobContent = (c: unknown): c is { blob?: string; text?: string } =>
