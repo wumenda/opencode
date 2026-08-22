@@ -103,7 +103,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
         url = buildBinaryResourceUrl(html.blob, html.mimeType ?? "application/octet-stream")
         revoke = () => URL.revokeObjectURL(url)
       } else {
-        throw new Error("mcp.app.loading")
+        throw new Error(language.t("mcp.app.loading"))
       }
       setBlobUrl(url)
       setSandbox(sandboxTokens)
