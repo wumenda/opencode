@@ -34,11 +34,21 @@ describe("readUiResource", () => {
 
     const html = await readUiResource(client, "ui://dashboard")
 
-    expect(html).toBe("<html><body><button /></body></html>")
+    expect(html.text).toBe("<html><body><button /></body></html>")
     expect(calls.find((call) => call.method === "resources/read")).toMatchObject({
       method: "resources/read",
       params: { uri: "ui://dashboard" },
     })
+  })
+
+  test("accepts text/html;profile=mcp-app resources", async () => {
+    const { client } = await setupClient({
+      contents: [{ uri: "ui://review", mimeType: "text/html;profile=mcp-app", text: "<html><body>review</body></html>" }],
+    })
+
+    const html = await readUiResource(client, "ui://review")
+
+    expect(html.text).toBe("<html><body>review</body></html>")
   })
 
   test("rejects non-HTML resources", async () => {
@@ -49,6 +59,28 @@ describe("readUiResource", () => {
   test("rejects resources without content", async () => {
     const { client } = await setupClient({ contents: [] })
     await expect(readUiResource(client, "ui://x")).rejects.toThrow()
+  })
+
+  test("accepts blob content and returns meta", async () => {
+    const { client } = await setupClient({
+      contents: [
+        {
+          uri: "ui://pdf",
+          mimeType: "application/pdf",
+          blob: "JVBERi0xLjQ=",
+          _meta: {
+            ui: {
+              csp: { connectDomains: ["https://api.example.com"] },
+              permissions: { clipboardWrite: {} },
+            },
+          },
+        },
+      ],
+    })
+    const out = await readUiResource(client, "ui://pdf")
+    expect(out.blob).toBe("JVBERi0xLjQ=")
+    expect(out.mimeType).toBe("application/pdf")
+    expect(out.meta?.ui?.csp?.connectDomains).toEqual(["https://api.example.com"])
   })
 })
 
@@ -83,5 +115,14 @@ describe("buildSandboxedHtml", () => {
 
     expect(url.startsWith("blob:")).toBe(true)
     revoke()
+  })
+
+  test("allows resource csp connect domains and permission sandbox tokens", () => {
+    const sandbox = buildSandboxedHtml("<html><head></head><body></body></html>", {
+      csp: { connectDomains: ["https://api.example.com"] },
+      permissions: { clipboardWrite: {} },
+    })
+    expect(sandbox.html).toContain("connect-src https://api.example.com")
+    expect(sandbox.sandbox).toBe("allow-scripts allow-clipboard-write")
   })
 })
