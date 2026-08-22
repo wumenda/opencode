@@ -1,8 +1,9 @@
 import type { CallToolResult, CreateMessageRequest, CreateMessageResult, CreateMessageResultWithTools } from "@modelcontextprotocol/sdk/types.js"
 import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { type Component, createSignal, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createMemo, type Component, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { Spinner } from "@opencode-ai/ui/spinner"
+import { useTheme } from "@opencode-ai/ui/theme/context"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
@@ -11,6 +12,7 @@ import { useMcpAppHost, type AppKey, type McpAppEvent, type McpAppSink } from "@
 import { HttpRpcTransport } from "@/lib/mcp-apps/http-rpc-transport"
 import { hostCapabilities } from "@/lib/mcp-apps/bridge"
 import { buildHostContext } from "@/lib/mcp-apps/host-context"
+import { toMcpTheme } from "@/lib/mcp-apps/host-context-utils"
 import { buildBinaryResourceUrl, buildSandboxedHtml, readUiResource } from "@/lib/mcp-apps/resource"
 import { mcpServerStatus } from "@/lib/mcp-apps/mcp-status"
 import { showToast } from "@/utils/toast"
@@ -47,6 +49,8 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   const serverSDK = useServerSDK()
   const sdk = useSDK()
   const host = useMcpAppHost()
+  const themeCtx = useTheme()
+  const resolvedTheme = createMemo(() => toMcpTheme(themeCtx.mode()))
 
   const [phase, setPhase] = createSignal<"loading" | "ready" | "error">("loading")
   const [errorMessage, setErrorMessage] = createSignal("")
@@ -59,6 +63,24 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   let bridge: AppBridge | undefined
   let revoke: (() => void) | undefined
   let unregister: (() => void) | undefined
+  let containerRef: HTMLDivElement | undefined
+  let resizeObserver: ResizeObserver | undefined
+
+  // 宿主主题或容器尺寸变化时，把最新 hostContext 实时推给 App（bridge 未就绪时为无害 no-op）。
+  const publishHostContext = (width?: number, height?: number) => {
+    void bridge?.setHostContext(
+      buildHostContext({ width, height, theme: resolvedTheme(), locale: language.intl() }),
+    )
+  }
+
+  const onResize = () => {
+    if (containerRef) publishHostContext(containerRef.clientWidth || undefined, containerRef.clientHeight || undefined)
+  }
+
+  createEffect(() => {
+    void resolvedTheme()
+    publishHostContext()
+  })
 
   // 宿主注册表以 server/resourceUri 为 key。App 尚未初始化（bridge 未就绪）前收到的
   // 事件先入 pending，oninitialized 后统一冲刷转发进 iframe。
@@ -85,9 +107,15 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   onMount(() => {
     void start()
     unregister = host.register(appKey(), handleEvent)
+    // 宿主容器尺寸变化时实时推送 hostContext（避免首帧容器尚未布局导致尺寸为 0）。
+    if (typeof ResizeObserver !== "undefined" && containerRef) {
+      resizeObserver = new ResizeObserver(onResize)
+      resizeObserver.observe(containerRef)
+    }
   })
   onCleanup(() => {
     unregister?.()
+    resizeObserver?.disconnect()
     void bridge?.close()
     void client?.close()
     revoke?.()
@@ -309,6 +337,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
 
   return (
     <div
+      ref={containerRef}
       class="w-full overflow-hidden rounded-xl border-[0.5px] border-v2-border-border-base bg-v2-background-bg-layer-01"
       classList={{ "h-full flex flex-col": props.fillHeight }}
     >
