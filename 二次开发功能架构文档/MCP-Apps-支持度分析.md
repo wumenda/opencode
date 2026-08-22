@@ -4,7 +4,7 @@
 > "Host" 指 opencode 后端（`packages/opencode`，httpapi 的 `/api/mcp/:name/rpc` relay）；"Web" 指前端（`packages/app`，`McpAppView` / `AppBridge`；以及 `packages/session-ui` 的 `mcp-tool.tsx`）。
 > 本版本为逐文件核对源码后的**当前实态**，取代早期基于印象的旧版结论——旧版标注的多项"未实现"（openLink、hostContext、blob/PDF 资源、资源 csp/permissions、sampling relay、teardown/message/updateModelContext、size-change）现已落地。
 
-**结论先行：已覆盖"最小可用宿主"的全部核心链路，并补齐了多项宿主能力，但**仍未达到"完全支持协议所有特性"**。核心渲染 + AppBridge 双向桥接 + 核心工具/资源/提示代理 + 结果回放 + 进度 + 打开外链 + 自动尺寸，均已可用并可跑通演示 App；但以下能力仍缺失或仅占位：sampling 的宿主侧真实实现、`ui/download-file`、`ui/message` 仅打日志不上屏、`ui/update-model-context` 仅打日志不落地、运行中 `tool-input / tool-input-partial / tool-cancelled` 流式推送、teardown 资源级、hostContext 主题/时区/实时更新、camera/mic/geolocation 权限、外部脚本语言域、blob/PDF 的 iframe 渲染。**
+**结论先行：核心能力已基本完整，但**仍未"完全支持所有特性"**。核心渲染 + AppBridge 双向桥接 + 核心工具/资源/提示代理 + 结果回放 + 进度 + 打开外链 + 自动尺寸 + 运行中流式 push（tool-input-partial / tool-result）+ 二进制 blob 渲染 + `ui/message` 上屏 + `ui/open-link` + `ui/download-file` + 优雅 teardown + hostContext（主题/时区/locale/尺寸）均已落地并可直接支持常见演示 App；仍缺失或占位：sampling 的宿主侧真实 LLM 实现（capability 未声明）、`ui/update-model-context` 仅日志、camera/mic/geolocation 权限、hostContext 的实时 `setHostContext` 订阅、以及 E2E 需在具备 Playwright 浏览器的环境下跑通。**
 
 ---
 
@@ -15,8 +15,8 @@
 | 工具声明 `metadata.mcp` + `ui.resourceUri` → 提取 App | `session-ui/src/components/mcp-tool.tsx`（`mcpAppFromPart`） | ✅ |
 | 抓取 `ui://` 资源（`resources/read` 经 relay） | `app/src/lib/mcp-apps/resource.ts`（`readUiResource`） | ✅ |
 | MIME 校验：`text/html` 与 `text/html;profile=mcp-app`（按 `;` 取 base） | `resource.ts` | ✅ |
-| 二进制/blob 资源解析（`text` / `blob` / `application/pdf`） | `resource.ts` | ⚠️ 可读，**渲染**未实现（见 §3.2） |
-| CSP 沙箱化 + blob URL | `resource.ts`（`injectCsp` / `buildSandboxedHtml`） | ✅ |
+| 二进制/blob 资源解析与**渲染**（`text` / `blob` / `application/pdf`） | `resource.ts`（`readUiResource` + `buildBinaryResourceUrl`）+ `McpAppView.start` 分派 | ✅ |
+| CSP 沙箱化 + blob URL（**含资源 `scriptDomains` 并入 `script-src`**） | `resource.ts`（`injectCsp` / `buildSandboxedHtml`） | ✅ |
 | **遵循资源 `_meta.ui.csp` 与 `_meta.ui.permissions`** | `McpAppView.start` → `buildSandboxedHtml(html.text, { csp, permissions })` | ✅（部分，见 §3.1） |
 | iframe 渲染（`sandbox="allow-scripts"`，隔离 opaque origin） | `McpAppView` | ✅ |
 | AppBridge 握手 `ui/initialize` + `notifications/initialized` | `McpAppView.onIframeLoad`（ext-apps `AppBridge`） | ✅ |
@@ -25,9 +25,12 @@
 | **进度**：`metadata.mcpProgress` → UI 进度条 | 后端 `session/tools` + `mcp-tool.tsx`（`mcpProgressFromPart`） | ✅ |
 | **打开外链** `ui/open-link` | `next.onopenlink → platform.openExternal(url)` | ✅ |
 | **自动尺寸** `ui/notifications/size-changed` | `next.onsizechange → setAutoHeight` | ✅（inline 模式） |
-| **hostContext**（locale / 尺寸 / displayMode） | `buildHostContext` + AppBridge `{ hostContext }` | ⚠️ 部分（见 §3.4） |
+| **hostContext**（主题 / 时区 / locale / 尺寸 / displayMode） | `buildHostContext` + AppBridge `{ hostContext }`（`theme` 由 props 透传、`timeZone` 走 `Intl` 兜底） | ⚠️ 缺实时 `setHostContext`（见 §3.4） |
+| **运行中流式 push**（`tool-input-partial` + 完成后 `tool-result`） | `session-ui/context/mcp-app-host.tsx`（宿主注册表）+ `mcp-tool.tsx`（running 预渲染并 push）+ `McpAppView`（注册/冲刷） | ✅ |
 | Listening（工具运行期 host→app 日志） | `PostMessageTransport.send` 覆写，仅控 `ui/notifications/*` | ⚠️ 诊断用 |
-| tool/message 占位 handler（日志，不落地） | `onmessage` / `onupdatemodelcontext` | ⚠️ 解析成功但无实义 |
+| `ui/message` 上屏 | `onmessage` 提取文本块 → 宿主 toast | ✅（轻量 toast，未写会话） |
+| `ui/open-link` / `ui/download-file` / 优雅 teardown | `onopenlink` / `ondownloadfile` / `onrequestteardown → teardownResource` | ✅ |
+| tool 占位 handler（日志，不落地） | `onupdatemodelcontext` | ⚠️ 仅日志 |
 
 Host 侧核心代理源：
 - 浏览器 `Client` 走 `HttpRpcTransport`（`app/src/lib/mcp-apps/http-rpc-transport.ts`）POST `/api/mcp/:name/rpc?directory=`。
@@ -51,12 +54,12 @@ Host 侧核心代理源：
 | `prompts/list`、`prompts/get` | ✅ | 同上 |
 | `sampling/createMessage` | ⚠️ | 后端 relay 已代理该方法，但前端**未声明 sampling 能力**、未接 LLM 实现 → App 实际拿不到采样 |
 | `ui/open-link` | ✅ | `onopenlink → platform.openExternal(params.url)` |
-| `ui/download-file` | ❌ | `downloadFile:false`（capability 未声明），无 handler |
-| `ui/message` | ⚠️ | `onmessage` 已设，但仅 `console.log` 并返回 `{}`，不上屏到会话 |
-| `ui/update-model-context` | ⚠️ | `onupdatemodelcontext` 已设，仅 `console.log` 返回 `{}`，不改变模型上下文 |
+| `ui/download-file` | ✅ | `ondownloadfile` 触发浏览器下载（EmbeddedResource / ResourceLink 两种分支） |
+| `ui/message` | ✅ | `onmessage` 提取文本块 → 宿主 toast 上屏（未写会话存储） |
+| `ui/update-model-context` | ⚠️ | `onupdatemodelcontext` 仅 `console.log`，不改变模型上下文 |
 | `ui/request-display-mode` | ⚠️ | AppBridge 默认回 `mode:"inline"`，无实际布局切换 |
-| `ui/resource-teardown` | ❌ | 未处理 |
-| `ui/request-teardown` | ⚠️ | `onrequestteardown → bridge.close()`（关闭桥接，无资源级清理） |
+| `ui/resource-teardown` | ✅ | `onrequestteardown → teardownResource`（向视图发 resource-teardown） |
+| `ui/request-teardown` | ✅ | 优雅 teardown 后关桥 |
 
 ### 2.2 A→H 通知
 
@@ -65,7 +68,7 @@ Host 侧核心代理源：
 | `ui/notifications/initialized` | ✅ 触发结果回放 |
 | `ui/notifications/size-changed` | ✅ `onsizechange` 驱动 iframe 自动高度 |
 | `ui/notifications/sandbox-proxy-ready` | — 本实现用 blob，不相关 |
-| `ui/notifications/tool-input` / `tool-input-partial` | ❌ 宿主不消费 |
+| `ui/notifications/tool-input` / `tool-input-partial` | ✅ App 主动上报时宿主可订阅（主路径是 Host 经注册表 H→A 推送） |
 | `ui/notifications/tool-result` | ✅ 由 App 上报时宿主订阅（但主路径是 H→A 回放） |
 | `ui/notifications/tool-cancelled` | ❌ 宿主不消费 |
 | `ui/notifications/host-context-changed` | — hostContext 静态，未走变更上报 |
@@ -75,9 +78,9 @@ Host 侧核心代理源：
 
 | 通知 | 现状 |
 |---|---|
-| `ui/notifications/tool-result` | ✅ 仅 App 初始化后回放**上次完成**的工具结果 |
-| `ui/notifications/tool-input` / `tool-input-partial` | ❌ 运行中不流式推送（`pushToolInput` 已有实现但**未接入任何触发源**） |
-| `ui/notifications/tool-cancelled` | ❌ |
+| `ui/notifications/tool-result` | ✅ App 初始化后回放结果 / 完成后经注册表 `tool-result` 推送 |
+| `ui/notifications/tool-input` / `tool-input-partial` | ✅ 运行中经宿主注册表 `tool-input-partial` 流式推送（running 预渲染） |
+| `ui/notifications/tool-cancelled` | ❌ 未实现 |
 | `ui/notifications/host-context-changed` | ❌（hostContext 仅初始化设置，无 `setHostContext`） |
 | `ui/notifications/sandbox-resource-ready` | ❌（用 blob） |
 | `notifications/tools \| resources \| prompts list_changed` | ✅ AppBridge 监听服务器变更并转发 |
@@ -86,34 +89,29 @@ Host 侧核心代理源：
 
 ## 3. 关键缺口细节（逐条说明，含部分实现的反证）
 
-### 3.1 沙箱 CSP / 权限：**部分**遵循，非全量
-`resource.ts` 的 `injectCsp` 现已把资源 `_meta.ui.csp` 的 `connectDomains / resourceDomains / frameDomains` 并入 CSP；`buildSandboxedHtml` 也据此在 iframe `sandbox` 上追加令牌。
-但仍有硬限制：
-- `script-src` **固定为** `'unsafe-inline' 'self' data:`，且 `SandboxOptions.csp` 类型**没有 `scriptDomains` 字段** → 官方 `https://.../ext-apps/client.js` 之类**外部脚本仍会被拦截**（`connect-src` 放行了但脚本不放行）。依赖外部 JS 的 App 仍不能工作。
+### 3.1 沙箱 CSP / 权限：**较大**遵循，camera/mic/geo 仍缺
+`injectCsp` 已把资源 `_meta.ui.csp` 的 `connectDomains / resourceDomains / frameDomains / scriptDomains` 并入 CSP；`buildSandboxedHtml` 据此在 iframe `sandbox` 上追加令牌。
+残余硬限制：
 - `permissions` 仅落实了 `clipboard-write`；**camera / microphone / geolocation 不授予**（源码注释明确：需宿主端授权策略，此处不静默放行）。
-- 影响："查看富媒体（外部源）""实时监控（外部数据/外部脚本）"类 App 仍受限。
+- `connect-src` 若读完 `connectDomains/resourceDomains` 为空仍回退 `'none'`，依赖外部 XHR/WS 且未声明域的应用受限（此即规范要求的声明式白名单，非缺陷）。
 
-### 3.2 仅 text 真正渲染，二进制/blob 只"读取不渲染"
-`readUiResource` 已能返回 `blob` 内容并接受 `application/pdf` MIME，但 `McpAppView.start` 里 `buildSandboxedHtml(html.text ?? "", ...)` **只用 `html.text`**——若资源是 blob-only（如 pdf-server、video-resource），`html.text` 为 `undefined`，会渲染成一个空 HTML 文档。**没有走 blob URL 直接当 iframe 源的路径**。
+### 3.2 二进制/blob 已可渲染
+`readUiResource` 返回 `blob`（base64）后，`McpAppView.start` 通过 `buildBinaryResourceUrl` 解码为 mime 型 blob URL 直接作为 iframe 源，pdf/video blob 资源现已可看（Task 2）。
 
-### 3.3 缺少"UI 预加载 / 工具输入流式 push"（核心商业模式缺口）
-`McpAppView.pushToolInput` 方法存在且会幂等地发出 `ui/notifications/tool-input-partial`，但**调用点只有它自己，没有从后端运行中事件接进来**。宿主只在工具**完成后**、App 初始化后回放一次 `tool-result`。运行中的 `tool-input / tool-input-partial / tool-cancelled` 均不推送。`McpAppRenderer`（`session-ui/context/mcp-app.tsx`）也只接收 `{server, resourceUri, fallbackData}`，不接收运行期流。
+### 3.3 运行中流式 push 已实现（tool-input-partial / tool-result）
+新增宿主注册表 `session-ui/context/mcp-app-host.tsx`：McpAppView 按 `${server}/${resourceUri}` 注册 sink，McpTool 在 running 预渲染 App 并推送 `tool-input-partial`，completed 推送 `tool-result`；McpAppView 在 `bridge` 就绪后统一冲刷 pending（Task 4）。`tool-cancelled` 仍未推送。
 
-### 3.4 hostContext 部分可用，缺主题/时区/实时
-`buildHostContext`（`host-context.ts`）产出：`displayMode:"inline"`、`locale`、`containerDimensions`、`platform:"web"`、`deviceCapabilities`。但：
-- `theme` 与 `timeZone` **未从宿主真实值传入**（调用处只传了 width/height/locale）。
-- `setHostContext` / `ui/notifications/host-context-changed` 未使用 → App 无法感知宿主主题与布局切换（默认走 inline、无明暗主题）。
+### 3.4 hostContext 主题/时区已补齐，缺实时推送
+`buildHostContext` 现透传 `theme`（props 传入）并用 `Intl.DateTimeFormat().resolvedOptions().timeZone` 兜底 `timeZone`（Task 3）。仍缺：随宿主变化的 `setHostContext` 实时订阅（`host-context-changed`），因仓库暂无现成 `useTheme` 钩子，未做投机性主题订阅。
 
 ### 3.5 sampling：后端能 relay，前端不成能力
-后端 `rpcCall` 已新增 `sampling/createMessage`（走 `client.request` + `CreateMessageResultSchema` 校验）。但前端 `hostCapabilities`（`bridge.ts`）**未声明 sampling**，`AppBridge` 也未接 `oncreatesamplingmessage` 到任何真实 LLM/provider。因此：
-- capability 层面 App 不会认为宿主支持采样 → 不会发起请求；
-- 即便直接 `client.request("sampling/createMessage")`，后端也只是把它 relay 到连接的 MCP 服务器，而采集响应仍需 App 侧处理，宿主无基于自身 provider 的采样回话。
+后端 `rpcCall` 已支持 `sampling/createMessage`，但前端 `hostCapabilities` **未声明 sampling**，`AppBridge` 未接 `oncreatesamplingmessage` 到真实 LLM → App 侧不请求采样（capability 未虚报，语义一致）。
 
-### 3.6 `ui/message` / `ui/update-model-context` 占位
-两者 handler 存在但不产生实义：`message` 仅打日志不上屏到会话；`update-model-context` 仅打日志不修改上下文。capability 中 `message:true` 已声明但 App 发送的内容无处落地。
+### 3.6 `ui/message` 已上屏，`update-model-context` 仍占位
+`onmessage` 现提取文本块经宿主 toast 呈现（Task 5，轻量上屏，未写会话存储）；**`update-model-context` 仍仅打日志**，未落模型上下文。
 
-### 3.7 teardown 仅请求级
-`ui/request-teardown` 关闭 bridge；**`ui/resource-teardown`**（资源级、App 主动释放）未处理；关闭时也未做 iframe 资源回收（仅 revoke blob URL / close bridge）。
+### 3.7 teardown 已优雅化
+`onrequestteardown` 现先 `await bridge.teardownResource({})`（向视图发 `ui/resource-teardown` 等待确认）再关桥（Task 6）；`revoke` 释放 blob URL。
 
 ### 3.8 版本/API 对齐——早期补丁已大部分固化且可用
 曾经的代差补丁多数已沉淀为稳定实现，但仍是"workaround 而非契约对齐"：
@@ -132,34 +130,34 @@ Host 侧核心代理源：
 | 核心渲染（工具→HTML→沙箱 iframe） | 🟢 高 | 可用 |
 | 双向桥接 / 代理 tools·resources·prompts | 🟢 高 | 可用（10 方法） |
 | 结果回放 + 工具进度 | 🟢 高 | 可用 |
+| **运行中流式 push（tool-input-partial / tool-result）** | 🟢 高 | 宿主注册表 + running 预渲染（Task 4） |
+| **二进制/blob 资源（读取+渲染）** | 🟢 高 | blob URL 直接渲染（Task 2） |
 | 打开外链 `ui/open-link` | 🟢 高 | 可用 |
+| **`ui/download-file`** | 🟢 高 | ondownloadfile（Task 6） |
+| **优雅 teardown（request→resource）** | 🟢 中高 | teardownResource（Task 6） |
+| **`ui/message` 上屏** | 🟡 中 | toast 轻量呈现（Task 5），未写会话 |
+| **hostContext（主题/时区/locale/尺寸）** | 🟡 中 | theme/timeZone 已透传；缺实时 setHostContext |
 | 自动尺寸 `size-changed` | 🟢 中高 | inline 模式可用 |
-| 资源 `csp` / `permissions` 遵循 | 🟡 中 | connect/frame/clipboard 可，外部脚本/camera·mic·geo 不行 |
-| 二进制/blob 资源（读取） | 🟡 中 | 可读，**渲染**未实现 |
-| hostContext（locale/尺寸） | 🟡 中 | 缺 theme/timeZone/实时更新 |
-| sampling | 🔴/🟡 | 后端 relay 有；前端不成能力、无 LLM 实现 → 实为无 |
-| `ui/download-file` | 🔴 无 | 未声明未实现 |
-| `ui/message` / `ui/update-model-context` | 🟡 占位 | 解析成功、仅日志，不落地 |
-| Teardown（request / resource） | 🟡 弱 | 仅 request 级关 bridge |
-| 运行中流式 push（tool-input·partial·cancelled） | 🔴 无 | 仅完成后单次回放 |
-| hostContext 主题/时区/实时 & 显示模式切换 | 🔴/🟡 | 静态 inline，缺主题 |
+| 资源 `csp` / `permissions` 遵循 | 🟡 中 | connect/frame/script/clipboard 可；camera·mic·geo 不行 |
+| sampling（真实 LLM） | 🔴 无 | 后端 relay 有；前端不成能力（语义一致，未虚报） |
+| `ui/update-model-context` | 🟡 占位 | 仅日志 |
+| hostContext 实时推送 & 显示模式切换 | 🔴/🟡 | 静态 inline，无 setHostContext 订阅 |
 | 协议版本 / SDK 契约对齐 | 🟡 中 | `2026-01-26`；靠 workaround 支撑 |
 
 ---
 
 ## 5. 结论与建议
 
-**是否"完全支持所有特性"：否，已'核心可用但未完整'。**
-现状是一个**功能较全的最小宿主**：能渲染 HTML App、经 AppBridge 代理核心 MCP 工具/资源/提示、回放结果、显示进度、打开外链、随内容自适应高度，足以跑通 `ui-server`、`pfd_topology` 等演示 App，且相较旧版已新增 openLink/hostContext/blob 读取/csp-permissions/sampling-relay/teardown/size-change 等。
+**是否"完全支持所有特性"：接近完善，但非完全。**
+现状已从"最小可用宿主"升级为**功能较全的宿主**：能渲染 HTML App（含 blob/pdf）、经 AppBridge 代理核心工具/资源/提示、回放结果、显示进度、打开外链、随内容自适应高度、运行中流式推送工具输入与结果、上屏 `ui/message`、支持下载与优雅 teardown、透传 hostContext 主题/时区。本轮（Task 1–7）已把运行中流式 push、二进制渲染、`scriptDomains`、hostContext 主题/时区、`ui/message`、`ui/download-file`、优雅 teardown 从"缺失/占位"补齐。
 
-要覆盖规范"所有特性"，按性价比建议补齐：
+仍建议按性价比跟进：
 
-1. **运行中流式 push（最高价值缺口）**：把后端工具运行期事件（`tool-input` / `tool-input-partial` / `tool-cancelled` / 结果）接入 `pushToolInput` 触发源，并让 `session-ui` 的 renderer 携带实时输入。这直接兑现概述强调的"UI 预加载 + 运行中数据流"。
-2. **sampling 成为真实能力**：在 `hostCapabilities` 声明 sampling，并让 AppBridge 的 `oncreatesamplingmessage` 走宿主既有 provider 回话；或至少明确降级"不支持"以消除二义。
-3. **沙箱补全**：给 `SandboxOptions` 增加 `scriptDomains` 并放入 `script-src`；权限（camera/mic/geolocation）在宿主授权策略就绪后透传 `allow-*`。
-4. **二进制渲染**：`readUiResource` 返回 blob 时，`McpAppView` 走"blob URL 直接作为 iframe 源 + 相应 MIME"路径，让 pdf/video blob 资源真正可看。
-5. **hostContext 完整化**：传入真实 `theme` / `timeZone`，并用 `setHostContext` 随宿主变化推送 `host-context-changed`。
-6. **`ui/message` 上屏、`update-model-context` 落地、`resource-teardown`、`download-file`**：视产品需要再接 handler；未接前保持 capability 与实现一致，避免"声明了却无实义"。
-7. **契约对齐**：逐步用新版 `@opencode-ai/client` 替代前端 workaround（双形状 / 204 / fetch-bind），把 relay 从补丁态收敛到规范对齐态。
+1. **sampling 真实实现（产品/基础设施决策）**：让 `hostCapabilities` 声明 `sampling`，并把 `oncreatesamplingmessage` 接到宿主既有 provider 回话。当前语义一致（未虚报），但协议特性未兑现。
+2. **hostContext 实时订阅**：接入宿主 `setHostContext`（如主题/容器尺寸变化时推送 `host-context-changed`），依赖引入现成 `useTheme` 类钩子。
+3. **`ui/update-model-context` 落地**：把 App 提交的上下文并入下一轮模型请求。
+4. **权限补全**：camera/mic/geolocation 在宿主授权策略就绪后透传 `allow-*`；`tool-cancelled` 运行中推送。
+5. **E2E 实测**：在具备 Playwright 浏览器的环境中运行新增用例（当前因浏览器缺失未执行）。
+6. **契约对齐**：逐步用新版 `@opencode-ai/client` 替代前端 workaround（双形状 / 204 / fetch-bind），把 relay 从补丁态收敛到规范对齐态。
 
-> 附注：以上"未实现/占位"多可基于已接入的 ext-apps `AppBridge` 增量补齐，无需重写基础设施。
+> 附注：剩余"未实现/占位"均可基于已接入的 ext-apps `AppBridge` 增量补齐，无需重写基础设施。
