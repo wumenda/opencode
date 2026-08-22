@@ -38,13 +38,22 @@ describe("mcpAppFromPart", () => {
     expect(info).toEqual({
       server: "weather",
       resourceUri: "ui://dashboard",
-      fallbackData: { content: [{ type: "text", text: "hello" }] },
+      // 结果改由宿主注册表推送，fallbackData 恒为 undefined，避免与注册表推送重复。
+      fallbackData: undefined,
     })
   })
 
-  test("returns undefined while tool is running", () => {
+  test("returns app info while tool is running (no fallbackData)", () => {
     const info = mcpAppFromPart(part({ status: "running", stateMetadata: { mcp: mcpMeta } }))
-    expect(info).toBeUndefined()
+    expect(info).toEqual({
+      server: "weather",
+      resourceUri: "ui://dashboard",
+      fallbackData: undefined,
+    })
+  })
+
+  test("returns undefined for error status even with mcp metadata", () => {
+    expect(mcpAppFromPart(part({ status: "error", stateMetadata: { mcp: mcpMeta } }))).toBeUndefined()
   })
 
   test("returns undefined without mcp metadata", () => {

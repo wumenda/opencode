@@ -1,9 +1,10 @@
-import { createMemo, Show } from "solid-js"
+import { createEffect, createMemo, Show } from "solid-js"
 import type { ToolPart } from "@opencode-ai/sdk/v2"
 import { useI18n } from "@opencode-ai/ui/context/i18n"
 import { Progress } from "@opencode-ai/ui/progress"
 import { BasicTool } from "./basic-tool"
 import { useMcpAppRenderer } from "../context/mcp-app"
+import { useMcpAppHost, type CallToolResult } from "../context/mcp-app-host"
 
 export type McpAppInfo = {
   server: string
@@ -25,16 +26,18 @@ function toolMetadata(part: ToolPart) {
   return "metadata" in part.state ? part.state.metadata : undefined
 }
 
-/** Extracts the inline MCP App (SEP-1865) to render for a completed tool part, if any. */
+/** Extracts the inline MCP App (SEP-1865) to render for a running or completed tool part, if any. */
 export function mcpAppFromPart(part: ToolPart): McpAppInfo | undefined {
-  if (part.state.status !== "completed") return
+  // running 或 completed 才可能承载 ui:// App；error 等其它状态不允许渲染。
+  if (part.state.status !== "running" && part.state.status !== "completed") return
   const mcp = record(toolMetadata(part)?.mcp)
   if (!mcp) return
   const server = mcp.server
   const resourceUri = record(mcp.ui)?.resourceUri
   if (typeof server !== "string" || !server) return
   if (typeof resourceUri !== "string" || !resourceUri) return
-  return { server, resourceUri, fallbackData: mcp.result }
+  // 结果不再经 fallbackData 注入，改由宿主注册表（McpAppHost）把运行中/最终事件推送给已挂载的 App。
+  return { server, resourceUri, fallbackData: undefined }
 }
 
 /** Extracts live MCP progress for a running tool part, if any. */
@@ -63,8 +66,37 @@ export function McpTool(props: {
 }) {
   const i18n = useI18n()
   const renderApp = useMcpAppRenderer()
+  const host = useMcpAppHost()
   const app = createMemo(() => mcpAppFromPart(props.part))
   const progress = createMemo(() => mcpProgressFromPart(props.part))
+
+  // 当前 running 状态的输入，作为流式部分输入推送给已挂载的 App。
+  const runningInput = createMemo<Record<string, unknown> | undefined>(() => {
+    if (props.part.state.status !== "running") return undefined
+    const input = props.part.state.input
+    // 仅接受纯对象输入，非纯对象则跳过推送。
+    return typeof input === "object" && input !== null ? (input as Record<string, unknown>) : undefined
+  })
+
+  // 工具运行中且已渲染 App 时，把部分输入推送给宿主注册表（由 McpAppView 转发进 iframe）。
+  createEffect(() => {
+    const info = app()
+    const input = runningInput()
+    if (!info || !input) return
+    host.push(`${info.server}/${info.resourceUri}`, { type: "tool-input-partial", arguments: input })
+  })
+
+  // 工具 completed 且携带 metadata.mcp.result 时，把最终结果推送给已挂载的 App。
+  createEffect(() => {
+    const info = app()
+    if (!info) return
+    if (props.part.state.status !== "completed") return
+    const mcp = record(toolMetadata(props.part)?.mcp)
+    const result = mcp?.result
+    if (result === undefined) return
+    host.push(`${info.server}/${info.resourceUri}`, { type: "tool-result", result: result as CallToolResult })
+  })
+
   const percent = createMemo(() => {
     const value = progress()
     if (!value?.total || value.total <= 0) return

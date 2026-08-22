@@ -1,12 +1,13 @@
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import { type Component, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
 import { useServerSDK } from "@/context/server-sdk"
+import { useMcpAppHost, type AppKey, type McpAppEvent, type McpAppSink } from "@opencode-ai/session-ui/context"
 import { HttpRpcTransport } from "@/lib/mcp-apps/http-rpc-transport"
 import { hostCapabilities } from "@/lib/mcp-apps/bridge"
 import { buildHostContext } from "@/lib/mcp-apps/host-context"
@@ -42,6 +43,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   const platform = usePlatform()
   const serverSDK = useServerSDK()
   const sdk = useSDK()
+  const host = useMcpAppHost()
 
   const [phase, setPhase] = createSignal<"loading" | "ready" | "error">("loading")
   const [errorMessage, setErrorMessage] = createSignal("")
@@ -52,9 +54,36 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   let client: Client | undefined
   let bridge: AppBridge | undefined
   let revoke: (() => void) | undefined
+  let unregister: (() => void) | undefined
 
-  onMount(() => void start())
+  // 宿主注册表以 server/resourceUri 为 key。App 尚未初始化（bridge 未就绪）前收到的
+  // 事件先入 pending，oninitialized 后统一冲刷转发进 iframe。
+  let appInitialized = false
+  const pending: McpAppEvent[] = []
+  const forward = (event: McpAppEvent) => {
+    if (!bridge) return
+    if (event.type === "tool-input-partial") void bridge.sendToolInputPartial({ arguments: event.arguments })
+    else if (event.type === "tool-result") void bridge.sendToolResult(event.result as CallToolResult)
+  }
+  const handleEvent: McpAppSink = (event) => {
+    if (!bridge || !appInitialized) {
+      pending.push(event)
+      return
+    }
+    forward(event)
+  }
+  const drainPending = () => {
+    while (pending.length) forward(pending.shift()!)
+  }
+
+  // 按 server/resourceUri 在宿主注册表注册/注销本 App 的 sink，接收运行中/完成的工具事件。
+  const appKey = () => `${props.server}/${props.resourceUri}` as AppKey
+  onMount(() => {
+    void start()
+    unregister = host.register(appKey(), handleEvent)
+  })
   onCleanup(() => {
+    unregister?.()
     void bridge?.close()
     void client?.close()
     revoke?.()
@@ -181,6 +210,9 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       { hostContext },
     )
     next.oninitialized = () => {
+      // App 就绪后先标记已初始化并冲刷 pending 事件，再回放 fallbackData（契约 1）。
+      appInitialized = true
+      drainPending()
       if (props.fallbackData) void next.sendToolResult(props.fallbackData)
     }
     next.onopenlink = async (params) => {

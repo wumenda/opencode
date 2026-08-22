@@ -1,5 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
-import { DataProvider, McpAppRendererProvider, type McpAppRendererInput } from "@opencode-ai/session-ui/context"
+import { DataProvider, McpAppRendererProvider, McpAppHostProvider, createMcpAppHostRegistry, type McpAppRendererInput } from "@opencode-ai/session-ui/context"
 import { McpAppView } from "@/components/mcp-app-view"
 import { showToast } from "@/utils/toast"
 import { base64Encode } from "@opencode-ai/core/util/encode"
@@ -28,6 +28,10 @@ function renderMcpApp(input: McpAppRendererInput) {
     />
   )
 }
+
+// 进程级宿主 App 注册表：McpTool 按 server/resourceUri push 事件，McpAppView 注册 sink
+// 消费并转发进 iframe。进程内共享，跨目录复用同一注册表。
+const mcpAppHost = createMcpAppHostRegistry()
 
 export function DirectoryDataProvider(
   props: ParentProps<{
@@ -83,9 +87,11 @@ export function DirectoryDataProvider(
           onNavigateToSession={(sessionID: string) => navigate(href(sessionID))}
           onSessionHref={href}
         >
-          <McpAppRendererProvider render={renderMcpApp}>
-            <LocalProvider>{props.children}</LocalProvider>
-          </McpAppRendererProvider>
+          <McpAppHostProvider host={mcpAppHost}>
+            <McpAppRendererProvider render={renderMcpApp}>
+              <LocalProvider>{props.children}</LocalProvider>
+            </McpAppRendererProvider>
+          </McpAppHostProvider>
         </DataProvider>
       )}
     </Show>
