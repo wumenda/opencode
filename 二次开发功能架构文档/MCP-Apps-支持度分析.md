@@ -148,16 +148,15 @@ Host 侧核心代理源：
 
 ## 5. 结论与建议
 
-**是否"完全支持所有特性"：接近完善，但非完全。**
-现状已从"最小可用宿主"升级为**功能较全的宿主**：能渲染 HTML App（含 blob/pdf）、经 AppBridge 代理核心工具/资源/提示、回放结果、显示进度、打开外链、随内容自适应高度、运行中流式推送工具输入与结果、上屏 `ui/message`、支持下载与优雅 teardown、透传 hostContext 主题/时区。本轮（Task 1–7）已把运行中流式 push、二进制渲染、`scriptDomains`、hostContext 主题/时区、`ui/message`、`ui/download-file`、优雅 teardown 从"缺失/占位"补齐。
+**是否"完全支持所有特性"：机制层已基本齐备，宿主注入/产品决策项除外。**
+现状已从"最小可用宿主"升级为**功能较全的宿主**：能渲染 HTML App（含 blob/pdf）、经 AppBridge 代理核心工具/资源/提示、回放结果、显示进度、打开外链、随内容自适应高度、运行中流式推送工具输入/结果/**取消**、上屏 `ui/message`、下载与优雅 teardown、hostContext（含**实时主题/尺寸订阅**）、**敏感权限透传**、**sampling 可插拔钩子**、**update-model-context 宿主 store**、**display-mode 显式协商**。两轮（Task 1–7 + 未实现功能 Task 1–6）已把未支持清单全部落地。
 
-仍建议按性价比跟进：
+真正剩余的是**宿主注入/产品决策**，非前端能力缺失（详见 [MCP-Apps-未支持功能清单.md](./MCP-Apps-%E6%9C%AA%E6%94%AF%E6%8C%81%E5%8A%9F%E8%83%BD%E6%B8%85%E5%8D%95.md) §4）：
 
-1. **sampling 真实实现（产品/基础设施决策）**：让 `hostCapabilities` 声明 `sampling`，并把 `oncreatesamplingmessage` 接到宿主既有 provider 回话。当前语义一致（未虚报），但协议特性未兑现。
-2. **hostContext 实时订阅**：接入宿主 `setHostContext`（如主题/容器尺寸变化时推送 `host-context-changed`），依赖引入现成 `useTheme` 类钩子。
-3. **`ui/update-model-context` 落地**：把 App 提交的上下文并入下一轮模型请求。
-4. **权限补全**：camera/mic/geolocation 在宿主授权策略就绪后透传 `allow-*`；`tool-cancelled` 运行中推送。
-5. **E2E 实测**：已在本机安装 Playwright 后跑通（mcp-app / mcp-progress spec 全绿）。后续 CI 需预装浏览器。
-6. **契约对齐**：逐步用新版 `@opencode-ai/client` 替代前端 workaround（双形状 / 204 / fetch-bind），把 relay 从补丁态收敛到规范对齐态。
+1. **sampling 真实 LLM**：Provider 传入 `onSampling`（含限流/成本/用户同意）后才能真采样。
+2. **update-model-context 并入模型上下文**：宿主读 `modelContextHost.latest()` 拼入下一轮请求。
+3. **fullscreen / pip 布局**：扩宿主布局体系与 `SUPPORTED_DISPLAY_MODES`。
+4. **hostContext 富字段**（`styles` / `availableDisplayModes` / `toolInfo`）按需填充。
+5. **契约对齐**：用新版 `@opencode-ai/client` 替代前端 workaround（双形状 / 204 / fetch-bind），把 relay 从补丁态收敛到规范对齐态。（E2E 已在本机 Playwright 环境跑通相关 spec。）
 
-> 附注：剩余"未实现/占位"均可基于已接入的 ext-apps `AppBridge` 增量补齐，无需重写基础设施。
+> 附注：以上宿主注入项不阻塞常见演示 App；前端机制均已实现，无需重写基础设施。
