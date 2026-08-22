@@ -1,5 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
-import { DataProvider, McpAppRendererProvider, McpAppHostProvider, createMcpAppHostRegistry, type McpAppRendererInput } from "@opencode-ai/session-ui/context"
+import { DataProvider, McpAppRendererProvider, McpAppHostProvider, createMcpAppHostRegistry, createModelContextStore, type McpAppRendererInput } from "@opencode-ai/session-ui/context"
 import { McpAppView } from "@/components/mcp-app-view"
 import { showToast } from "@/utils/toast"
 import { base64Encode } from "@opencode-ai/core/util/encode"
