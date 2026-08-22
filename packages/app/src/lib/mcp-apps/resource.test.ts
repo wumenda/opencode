@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { HttpRpcTransport } from "./http-rpc-transport"
-import { buildSandboxedHtml, injectCsp, readUiResource } from "./resource"
+import { buildBinaryResourceUrl, buildSandboxedHtml, injectCsp, readUiResource } from "./resource"
 
 /** Builds a real MCP Client wired to a mock relay, mirroring the McpAppView flow. */
 async function setupClient(resourcesReadResult: unknown) {
@@ -113,6 +113,15 @@ describe("injectCsp", () => {
     expect(html).toMatch(/^<!DOCTYPE html>/i)
     expect(html).toContain('http-equiv="Content-Security-Policy"')
     expect(html).toContain("<p>hello</p>")
+  })
+})
+
+describe("buildBinaryResourceUrl", () => {
+  test("decodes base64 blob into a mime-typed object URL", () => {
+    // base64 of "<h1>hi</h1>" is "PGgxPmhpPC9oMT4="
+    const url = buildBinaryResourceUrl("PGgxPmhpPC9oMT4=", "text/html")
+    expect(url.startsWith("blob:")).toBe(true)
+    globalThis.URL.revokeObjectURL(url)
   })
 })
 

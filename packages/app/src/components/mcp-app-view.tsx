@@ -10,7 +10,7 @@ import { useServerSDK } from "@/context/server-sdk"
 import { HttpRpcTransport } from "@/lib/mcp-apps/http-rpc-transport"
 import { hostCapabilities } from "@/lib/mcp-apps/bridge"
 import { buildHostContext } from "@/lib/mcp-apps/host-context"
-import { buildSandboxedHtml, readUiResource } from "@/lib/mcp-apps/resource"
+import { buildBinaryResourceUrl, buildSandboxedHtml, readUiResource } from "@/lib/mcp-apps/resource"
 import { mcpServerStatus } from "@/lib/mcp-apps/mcp-status"
 import { authTokenFromCredentials } from "@/utils/server"
 
@@ -92,10 +92,21 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       await next.connect(transport)
       client = next
       const html = await readUiResource(next, props.resourceUri)
-      const sandbox = buildSandboxedHtml(html.text ?? "", { csp: html.meta?.ui?.csp, permissions: html.meta?.ui?.permissions })
-      revoke = sandbox.revoke
-      setBlobUrl(sandbox.url)
-      setSandbox(sandbox.sandbox)
+      let url: string
+      let sandboxTokens = "allow-scripts"
+      if (html.text) {
+        const s = buildSandboxedHtml(html.text, { csp: html.meta?.ui?.csp, permissions: html.meta?.ui?.permissions })
+        url = s.url
+        sandboxTokens = s.sandbox
+        revoke = s.revoke
+      } else if (html.blob) {
+        url = buildBinaryResourceUrl(html.blob, html.mimeType ?? "application/octet-stream")
+        revoke = () => URL.revokeObjectURL(url)
+      } else {
+        throw new Error("mcp.app.loading")
+      }
+      setBlobUrl(url)
+      setSandbox(sandboxTokens)
       setPhase("ready")
     } catch (error) {
       void next.close()

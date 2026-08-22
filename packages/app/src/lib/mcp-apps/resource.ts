@@ -86,3 +86,10 @@ export function buildSandboxedHtml(
 
   return { url, revoke: () => URL.revokeObjectURL(url), html: htmlOut, sandbox: allows.join(" ") }
 }
+
+/** Decodes a base64 binary resource (from ResourceContents.blob) into a mime-typed object URL. */
+export function buildBinaryResourceUrl(blobB64: string, mimeType: string): string {
+  const binary = atob(blobB64)
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }))
+}
