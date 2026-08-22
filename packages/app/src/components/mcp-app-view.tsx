@@ -13,6 +13,7 @@ import { hostCapabilities } from "@/lib/mcp-apps/bridge"
 import { buildHostContext } from "@/lib/mcp-apps/host-context"
 import { buildBinaryResourceUrl, buildSandboxedHtml, readUiResource } from "@/lib/mcp-apps/resource"
 import { mcpServerStatus } from "@/lib/mcp-apps/mcp-status"
+import { showToast } from "@/utils/toast"
 import { authTokenFromCredentials } from "@/utils/server"
 
 const CONNECT_TIMEOUT_MS = 30_000
@@ -206,7 +207,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     const next = new AppBridge(
       client,
       { name: "opencode", version: "1.0.0" },
-      hostCapabilities({ openLink: true, downloadFile: false, message: true, logging: true }),
+      hostCapabilities({ openLink: true, downloadFile: true, message: true, logging: true }),
       { hostContext },
     )
     next.oninitialized = () => {
@@ -219,8 +220,13 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       platform.openExternal(params.url)
       return {}
     }
-    next.onmessage = async (params) => {
-      console.log("[mcp-app] app message", params)
+    next.onmessage = async ({ content }, _extra) => {
+      // 把 App 发来的 ui/message 文本上屏到宿主（轻量呈现：toast）。若接入会话存储可替换为写会话。
+      const text = content
+        .filter((block) => block.type === "text" && typeof block.text === "string")
+        .map((block) => (block as { text: string }).text)
+        .join("\n")
+      if (text) showToast(text)
       return {}
     }
     next.onupdatemodelcontext = async (params) => {
@@ -228,7 +234,42 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       return {}
     }
     next.onrequestteardown = async () => {
+      // 视图请求卸载：先发 ui/resource-teardown 让视图优雅结束，再关桥。
+      try {
+        await next.teardownResource({})
+      } catch {
+        // 视图未应答，忽略后继续卸载
+      }
       void next.close()
+    }
+    next.ondownloadfile = async ({ contents }, _extra) => {
+      const trigger = async (uri: string, body: { text?: string; blob?: string; mimeType?: string }) => {
+        const mime = body.mimeType
+        const blob = body.blob
+          ? new Blob([Uint8Array.from(atob(body.blob), (c) => c.charCodeAt(0))], { type: mime })
+          : new Blob([body.text ?? ""], { type: mime })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = uri.split("/").pop() ?? "download"
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+      try {
+        for (const item of contents) {
+          if (item.type === "resource") {
+            await trigger(item.resource.uri, item.resource as { text?: string; blob?: string; mimeType?: string })
+          } else if (item.type === "resource_link" && client) {
+            const read = await client.readResource({ uri: item.uri })
+            const c = read.contents[0] as { text?: string; blob?: string; mimeType?: string } | undefined
+            await trigger(item.uri, c ?? {})
+          }
+        }
+        return {}
+      } catch (error) {
+        console.error("[mcp-app] download failed", error)
+        return { isError: true }
+      }
     }
     next.onsizechange = (h: { width?: number; height?: number }) => {
       if (h.height) setAutoHeight(h.height)

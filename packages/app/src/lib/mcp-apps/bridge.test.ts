@@ -19,3 +19,10 @@ test("omits unset capabilities", () => {
   expect(caps.logging).toBeUndefined()
   expect(caps.serverTools).toBeDefined()
 })
+
+test("declares downloadFile when enabled", () => {
+  const caps = hostCapabilities({ openLink: false, downloadFile: true, message: false, logging: false })
+  expect(caps.downloadFile).toEqual({})
+  expect(caps.openLinks).toBeUndefined()
+  expect(caps.message).toBeUndefined()
+})
