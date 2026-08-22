@@ -141,4 +141,14 @@ describe("buildSandboxedHtml", () => {
     expect(sandbox.html).toContain("connect-src https://api.example.com")
     expect(sandbox.sandbox).toBe("allow-scripts allow-clipboard-write")
   })
+
+  test("maps requested resource permissions into an iframe allow attribute", () => {
+    const sandbox = buildSandboxedHtml("<html><head></head><body></body></html>", {
+      permissions: { clipboardWrite: {}, camera: {}, microphone: {}, geolocation: {} },
+    })
+    expect(sandbox.allow).toContain("camera")
+    expect(sandbox.allow).toContain("microphone")
+    expect(sandbox.allow).toContain("geolocation")
+    expect(sandbox.allow).toContain("clipboard-write")
+  })
 })

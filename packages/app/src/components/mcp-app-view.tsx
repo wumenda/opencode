@@ -52,6 +52,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   const [errorMessage, setErrorMessage] = createSignal("")
   const [blobUrl, setBlobUrl] = createSignal<string>()
   const [sandbox, setSandbox] = createSignal("allow-scripts")
+  const [allow, setAllow] = createSignal("")
   const [autoHeight, setAutoHeight] = createSignal<number>()
 
   let client: Client | undefined
@@ -106,6 +107,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     revoke?.()
     revoke = undefined
     setBlobUrl()
+    setAllow("")
     setPhase("loading")
 
     const directory = sdk().directory
@@ -132,6 +134,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
         const s = buildSandboxedHtml(html.text, { csp: html.meta?.ui?.csp, permissions: html.meta?.ui?.permissions })
         url = s.url
         sandboxTokens = s.sandbox
+        setAllow(s.allow)
         revoke = s.revoke
       } else if (html.blob) {
         url = buildBinaryResourceUrl(html.blob, html.mimeType ?? "application/octet-stream")
@@ -337,6 +340,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
         <iframe
           src={blobUrl()}
           sandbox={sandbox()}
+          allow={allow()}
           class="w-full border-0 bg-v2-background-bg-layer-01"
           classList={{ "h-80": !props.fillHeight && !autoHeight(), "flex-1": props.fillHeight }}
           style={autoHeight() ? { height: `${autoHeight()}px` } : undefined}

@@ -71,20 +71,36 @@ export function injectCsp(html: string, csp?: SandboxOptions["csp"]): string {
   return `<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="${base}"></head><body>${html}</body></html>`
 }
 
+/** 将请求的 MCP App 敏感权限映射为 iframe Permission-Policy 的 allow 属性值。 */
+export function buildAllow(permissions?: SandboxOptions["permissions"]): string {
+  const parts: string[] = []
+  if (permissions?.clipboardWrite) parts.push("clipboard-write")
+  if (permissions?.camera) parts.push("camera")
+  if (permissions?.microphone) parts.push("microphone")
+  if (permissions?.geolocation) parts.push("geolocation")
+  return parts.join("; ")
+}
+
 /** Builds a CSP-sandboxed document and returns its blob URL, cleaned HTML, and iframe sandbox tokens with a cleanup function. */
 export function buildSandboxedHtml(
   html: string,
   opts?: SandboxOptions,
-): { url: string; revoke: () => void; html: string; sandbox: string } {
+): { url: string; revoke: () => void; html: string; sandbox: string; allow: string } {
   const htmlOut = injectCsp(html, opts?.csp)
   const blob = new Blob([htmlOut], { type: "text/html" })
   const url = URL.createObjectURL(blob)
 
   const allows = ["allow-scripts"]
   if (opts?.permissions?.clipboardWrite) allows.push("allow-clipboard-write")
-  // camera / microphone / geolocation 需要宿主端授权策略，此处不静默放行（仅注释说明）
+  // camera / microphone / geolocation 的沙箱放行依赖顶层文档授权策略，此处不改动 sandbox 令牌
 
-  return { url, revoke: () => URL.revokeObjectURL(url), html: htmlOut, sandbox: allows.join(" ") }
+  return {
+    url,
+    revoke: () => URL.revokeObjectURL(url),
+    html: htmlOut,
+    sandbox: allows.join(" "),
+    allow: buildAllow(opts?.permissions),
+  }
 }
 
 /** Decodes a base64 binary resource (from ResourceContents.blob) into a mime-typed object URL. */
