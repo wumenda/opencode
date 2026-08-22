@@ -2271,7 +2271,7 @@ export default function Page() {
                 <div class="min-h-0 flex-1">
                   <Suspense>
                     <SessionSidePanel
-                      canReview={canReview}
+                      canReview={() => !!params.id}
                       diffs={reviewDiffs}
                       diffsReady={reviewReady}
                       empty={reviewEmptyText}
