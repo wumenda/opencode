@@ -32,6 +32,8 @@ function renderMcpApp(input: McpAppRendererInput) {
 // 进程级宿主 App 注册表：McpTool 按 server/resourceUri push 事件，McpAppView 注册 sink
 // 消费并转发进 iframe。进程内共享，跨目录复用同一注册表。
 const mcpAppHost = createMcpAppHostRegistry()
+// 进程级模型上下文 store：App 通过 ui/update-model-context 写入，宿主在别处读 latest() 消费。
+const modelContextHost = createModelContextStore()
 
 export function DirectoryDataProvider(
   props: ParentProps<{

@@ -8,7 +8,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
 import { useServerSDK } from "@/context/server-sdk"
-import { useMcpAppHost, type AppKey, type McpAppEvent, type McpAppSink } from "@opencode-ai/session-ui/context"
+import { useMcpAppHost, useMcpModelContext, type AppKey, type McpAppEvent, type McpAppSink } from "@opencode-ai/session-ui/context"
 import { HttpRpcTransport } from "@/lib/mcp-apps/http-rpc-transport"
 import { hostCapabilities } from "@/lib/mcp-apps/bridge"
 import { buildHostContext } from "@/lib/mcp-apps/host-context"
@@ -267,8 +267,9 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       if (text) showToast(text)
       return {}
     }
-    next.onupdatemodelcontext = async (params) => {
-      console.log("[mcp-app] update model context", params)
+    next.onupdatemodelcontext = async ({ content, structuredContent }, _extra) => {
+      // 把 App 发来的 ui/update-model-context 写入宿主可读的 store，供后续并入模型上下文。
+      modelCtx.set({ content, structuredContent })
       return {}
     }
     next.onrequestteardown = async () => {
