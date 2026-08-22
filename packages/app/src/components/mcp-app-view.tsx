@@ -1,4 +1,4 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
+import type { CallToolResult, CreateMessageRequest, CreateMessageResult, CreateMessageResultWithTools } from "@modelcontextprotocol/sdk/types.js"
 import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { type Component, createSignal, onCleanup, onMount, Show } from "solid-js"
@@ -31,6 +31,8 @@ export type McpAppViewProps = {
   fillHeight?: boolean
   /** 传入 hostContext 的主题，透传给 MCP App（沿用宿主侧明暗主题）。 */
   theme?: "light" | "dark"
+  /** 宿主提供的采样实现：接通 AppBridge 的 oncreatesamplingmessage（声明 sampling 能力）。 */
+  onSampling?: (request: CreateMessageRequest["params"]) => Promise<CreateMessageResult | CreateMessageResultWithTools>
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -207,9 +209,13 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     const next = new AppBridge(
       client,
       { name: "opencode", version: "1.0.0" },
-      hostCapabilities({ openLink: true, downloadFile: true, message: true, logging: true }),
+      hostCapabilities({ openLink: true, downloadFile: true, message: true, logging: true, sampling: !!props.onSampling }),
       { hostContext },
     )
+    if (props.onSampling) {
+      // 接通宿主采样实现：App 发起 sampling 时委托给宿主提供的 onSampling。
+      next.oncreatesamplingmessage = async (params) => props.onSampling!(params)
+    }
     next.oninitialized = () => {
       // App 就绪后标记已初始化并回放 fallbackData（契约 1）。
       // pending 事件要等 `bridge` 赋值后再冲刷（见 connect 成功处），否则会被 forward 丢弃。

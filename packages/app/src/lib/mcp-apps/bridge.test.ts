@@ -26,3 +26,10 @@ test("declares downloadFile when enabled", () => {
   expect(caps.openLinks).toBeUndefined()
   expect(caps.message).toBeUndefined()
 })
+
+test("declares sampling when a handler is enabled", () => {
+  const caps = hostCapabilities({ openLink: false, downloadFile: false, message: false, logging: false, sampling: true })
+  expect(caps.sampling).toEqual({})
+  const off = hostCapabilities({ openLink: true, downloadFile: true, message: true, logging: true, sampling: false })
+  expect(off.sampling).toBeUndefined()
+})
