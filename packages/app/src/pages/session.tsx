@@ -85,6 +85,7 @@ import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { sessionPanelLayout } from "@/pages/session/session-panel-layout"
 import { SessionReviewEmptyChangesV2 } from "@opencode-ai/session-ui/v2/session-review-empty-changes-v2"
 import { SessionReviewEmptyNoGitV2 } from "@opencode-ai/session-ui/v2/session-review-empty-no-git-v2"
+import { createReviewPanelV2State } from "@/pages/session/v2/review-panel-v2-state"
 import { reviewDiffDirectory, reviewDiffNeedsLoad, reviewRootDirectory } from "@/pages/session/v2/review-diff-kinds"
 import { McpAppsPanel } from "@/pages/session/v2/mcp-apps-panel"
 import { createMcpAppsPanelState } from "@/pages/session/v2/mcp-apps-panel-state"
@@ -1294,6 +1295,7 @@ export default function Page() {
 
   const mcpAppsState = createMcpAppsPanelState()
   const mcpApps = useMcpApps(() => params.id)
+  const reviewV2State = createReviewPanelV2State()
 
   const mcpAppsPanel = () => (
     <div class="flex flex-col h-full overflow-hidden bg-v2-background-bg-base contain-strict">
@@ -2291,6 +2293,7 @@ export default function Page() {
                       reviewHasFocusableContent={() => mcpApps().length > 0}
                       reviewCount={() => mcpApps().length}
                       reviewPanel={mcpAppsPanel}
+                      fileBrowserState={reviewV2State}
                       activeDiff={activeReviewFile()}
                       focusReviewDiff={focusReviewDiff}
                       reviewSnap={ui.reviewSnap}
