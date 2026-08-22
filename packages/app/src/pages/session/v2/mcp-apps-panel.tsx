@@ -85,6 +85,7 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
                     ? (app().fallbackData as CallToolResult)
                     : undefined
                 }
+                fillHeight
               />
             )}
           </Show>

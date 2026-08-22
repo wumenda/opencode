@@ -22,6 +22,8 @@ export type McpAppViewProps = {
   /** Completed tool result (contract 1 metadata.mcp.result) replayed into the app after init. */
   fallbackData?: CallToolResult
   onError?: (message: string) => void
+  /** 填满父容器高度（用于面板模式），默认 false 使用固定 h-80。 */
+  fillHeight?: boolean
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -144,15 +146,24 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   }
 
   return (
-    <div class="w-full overflow-hidden rounded-xl border-[0.5px] border-v2-border-border-base bg-v2-background-bg-layer-01">
+    <div
+      class="w-full overflow-hidden rounded-xl border-[0.5px] border-v2-border-border-base bg-v2-background-bg-layer-01"
+      classList={{ "h-full flex flex-col": props.fillHeight }}
+    >
       <Show when={phase() === "loading"}>
-        <div class="flex h-80 items-center justify-center gap-2 text-v2-text-text-muted">
+        <div
+          class="flex items-center justify-center gap-2 text-v2-text-text-muted"
+          classList={{ "h-80": !props.fillHeight, "flex-1": props.fillHeight }}
+        >
           <Spinner class="size-4" />
           <span class="text-[13px] font-[440] leading-5 tracking-[-0.04px]">{language.t("mcp.app.loading")}</span>
         </div>
       </Show>
       <Show when={phase() === "error"}>
-        <div class="flex h-80 flex-col items-center justify-center gap-2 text-v2-text-text-muted">
+        <div
+          class="flex flex-col items-center justify-center gap-2 text-v2-text-text-muted"
+          classList={{ "h-80": !props.fillHeight, "flex-1": props.fillHeight }}
+        >
           <span class="text-[13px] font-[440] leading-5 tracking-[-0.04px]">{errorMessage()}</span>
           <button
             type="button"
@@ -167,7 +178,8 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
         <iframe
           src={blobUrl()}
           sandbox="allow-scripts"
-          class="h-80 w-full border-0 bg-v2-background-bg-layer-01"
+          class="w-full border-0 bg-v2-background-bg-layer-01"
+          classList={{ "h-80": !props.fillHeight, "flex-1": props.fillHeight }}
           onLoad={(event) => void onIframeLoad(event.currentTarget)}
         />
       </Show>
