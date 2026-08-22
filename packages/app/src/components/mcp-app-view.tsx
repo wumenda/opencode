@@ -10,6 +10,7 @@ import { useSDK } from "@/context/sdk"
 import { useServerSDK } from "@/context/server-sdk"
 import { useMcpAppHost, useMcpModelContext, type AppKey, type McpAppEvent, type McpAppSink } from "@opencode-ai/session-ui/context"
 import { HttpRpcTransport } from "@/lib/mcp-apps/http-rpc-transport"
+import { resolveDisplayMode, SUPPORTED_DISPLAY_MODES } from "@/lib/mcp-apps/display-mode"
 import { hostCapabilities } from "@/lib/mcp-apps/bridge"
 import { buildHostContext } from "@/lib/mcp-apps/host-context"
 import { toMcpTheme } from "@/lib/mcp-apps/host-context-utils"
@@ -309,6 +310,10 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
         console.error("[mcp-app] download failed", error)
         return { isError: true }
       }
+    }
+    next.onrequestdisplaymode = async ({ mode }) => {
+      // 显式协商显示模式：按宿主支持列表决定实际生效模式，不支持则回退 inline。
+      return { mode: resolveDisplayMode(mode, SUPPORTED_DISPLAY_MODES) }
     }
     next.onsizechange = (h: { width?: number; height?: number }) => {
       if (h.height) setAutoHeight(h.height)
