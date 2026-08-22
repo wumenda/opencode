@@ -210,9 +210,9 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       { hostContext },
     )
     next.oninitialized = () => {
-      // App 就绪后先标记已初始化并冲刷 pending 事件，再回放 fallbackData（契约 1）。
+      // App 就绪后标记已初始化并回放 fallbackData（契约 1）。
+      // pending 事件要等 `bridge` 赋值后再冲刷（见 connect 成功处），否则会被 forward 丢弃。
       appInitialized = true
-      drainPending()
       if (props.fallbackData) void next.sendToolResult(props.fallbackData)
     }
     next.onopenlink = async (params) => {
@@ -246,6 +246,8 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       }
       await next.connect(transport)
       bridge = next
+      // bridge 就绪后才冲刷初始化期间缓冲的流式事件，避免 forward 因 bridge 未赋值而丢弃。
+      if (appInitialized) drainPending()
     } catch (error) {
       void next.close()
       const message = error instanceof Error ? error.message : String(error)
