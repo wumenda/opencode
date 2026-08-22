@@ -85,10 +85,10 @@ import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { sessionPanelLayout } from "@/pages/session/session-panel-layout"
 import { SessionReviewEmptyChangesV2 } from "@opencode-ai/session-ui/v2/session-review-empty-changes-v2"
 import { SessionReviewEmptyNoGitV2 } from "@opencode-ai/session-ui/v2/session-review-empty-no-git-v2"
-import { SessionReviewV2SidebarToggle } from "@opencode-ai/session-ui/v2/session-review-v2"
-import { ReviewPanelV2 } from "@/pages/session/v2/review-panel-v2"
-import { createReviewPanelV2State } from "@/pages/session/v2/review-panel-v2-state"
 import { reviewDiffDirectory, reviewDiffNeedsLoad, reviewRootDirectory } from "@/pages/session/v2/review-diff-kinds"
+import { McpAppsPanel } from "@/pages/session/v2/mcp-apps-panel"
+import { createMcpAppsPanelState } from "@/pages/session/v2/mcp-apps-panel-state"
+import { useMcpApps } from "@/pages/session/v2/use-mcp-apps"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { TerminalPanelV2 } from "@/pages/session/terminal-panel-v2"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
@@ -1292,67 +1292,12 @@ export default function Page() {
     </Show>
   )
 
-  const reviewV2State = createReviewPanelV2State()
+  const mcpAppsState = createMcpAppsPanelState()
+  const mcpApps = useMcpApps(() => params.id)
 
-  // Getters defer reactive reads to the consuming scope. Eager reads here ran inside
-  // the side panel's Show children and remounted the whole review panel on unrelated
-  // updates such as session switches.
-  const reviewPanelV2Props = () => ({
-    get title() {
-      return changesTitleV2()
-    },
-    get empty() {
-      return reviewEmptyV2()
-    },
-    diffs: reviewDiffs,
-    diffsReady: reviewReady,
-    get diffVersion() {
-      return vcsQuery.dataUpdatedAt
-    },
-    loadDiff: loadReviewDiff,
-    get activeFile() {
-      return activeReviewFile()
-    },
-    onSelectFile: focusReviewDiff,
-    get diffStyle() {
-      return layout.review.diffStyle()
-    },
-    onDiffStyleChange: layout.review.setDiffStyle,
-    state: reviewV2State,
-    onLineComment: (comment: SessionReviewLineComment) => addCommentToContext({ ...comment, origin: "review" }),
-    onLineCommentUpdate: updateCommentInContext,
-    onLineCommentDelete: removeCommentFromContext,
-    get lineCommentActions() {
-      return reviewCommentActions()
-    },
-    get comments() {
-      return comments.all()
-    },
-    get focusedComment() {
-      return comments.focus()
-    },
-    onFocusedCommentChange: (focus: { file: string; id: string } | null) => {
-      // The preview clears the focus once it has opened the comment; persist the
-      // focused file as the active selection so the preview stays on it. Skip
-      // files outside the current diff set (their focus is cleared unhandled).
-      if (!focus) {
-        const current = comments.focus()
-        if (current && reviewDiffs().some((diff) => diff.file === current.file)) focusReviewDiff(current.file)
-      }
-      comments.setFocus(focus)
-    },
-  })
-
-  // Latch: defer only the first diff render off the mount critical path. This Page
-  // stays mounted across same-workspace session tab switches, so gating on every
-  // deferRender flip tore down and remounted the whole review pane on tab switch.
-  const reviewPanelV2Rendered = createMemo<boolean>((prev) => prev || !store.deferRender, false)
-
-  const reviewPanelV2 = () => (
+  const mcpAppsPanel = () => (
     <div class="flex flex-col h-full overflow-hidden bg-v2-background-bg-base contain-strict">
-      <Show when={reviewPanelV2Rendered()}>
-        <ReviewPanelV2 {...reviewPanelV2Props()} />
-      </Show>
+      <McpAppsPanel apps={mcpApps} state={mcpAppsState} />
     </div>
   )
 
@@ -2330,18 +2275,10 @@ export default function Page() {
                       diffs={reviewDiffs}
                       diffsReady={reviewReady}
                       empty={reviewEmptyText}
-                      hasReview={hasReview}
-                      reviewHasFocusableContent={() => hasReview() || reviewV2State.sidebarOpened()}
-                      reviewCount={reviewCount}
-                      reviewPanel={reviewPanelV2}
-                      reviewSidebarToggle={(disabled) => (
-                        <SessionReviewV2SidebarToggle
-                          opened={reviewV2State.sidebarOpened()}
-                          disabled={disabled}
-                          onToggle={reviewV2State.toggleSidebar}
-                        />
-                      )}
-                      fileBrowserState={reviewV2State}
+                      hasReview={() => mcpApps().length > 0}
+                      reviewHasFocusableContent={() => mcpApps().length > 0}
+                      reviewCount={() => mcpApps().length}
+                      reviewPanel={mcpAppsPanel}
                       activeDiff={activeReviewFile()}
                       focusReviewDiff={focusReviewDiff}
                       reviewSnap={ui.reviewSnap}
