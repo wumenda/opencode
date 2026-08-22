@@ -5,7 +5,7 @@ import { buildSandboxedHtml, injectCsp, readUiResource } from "./resource"
 
 /** Builds a real MCP Client wired to a mock relay, mirroring the McpAppView flow. */
 async function setupClient(resourcesReadResult: unknown) {
-  const calls: Array<{ method: string; params: unknown }> = []
+  const calls: Array<{ method: string; params?: unknown }> = []
   const fetchFn = async (input: string | URL, init?: RequestInit) => {
     const body = (await new Request(input, init).json()) as {
       method: string

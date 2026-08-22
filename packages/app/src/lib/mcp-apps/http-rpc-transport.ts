@@ -1,5 +1,11 @@
 import type { Transport, TransportSendOptions } from "@modelcontextprotocol/sdk/shared/transport.js"
-import type { JSONRPCMessage, JSONRPCResponse, RequestId } from "@modelcontextprotocol/sdk/types.js"
+import type {
+  JSONRPCMessage,
+  JSONRPCNotification,
+  JSONRPCRequest,
+  JSONRPCResponse,
+  RequestId,
+} from "@modelcontextprotocol/sdk/types.js"
 
 type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>
 
@@ -57,7 +63,7 @@ export class HttpRpcTransport implements Transport {
     if (!this.started) throw new Error("HttpRpcTransport not started")
     // Responses to server-initiated requests never occur over this relay.
     if (!("method" in message)) return
-    if (message.id === undefined) {
+    if (!("id" in message)) {
       void this.post(message).catch((error) => this.onerror?.(asError(error)))
       return
     }
@@ -78,7 +84,7 @@ export class HttpRpcTransport implements Transport {
     this.onclose?.()
   }
 
-  private post(message: JSONRPCMessage) {
+  private post(message: JSONRPCRequest | JSONRPCNotification) {
     return this.fetchFn(this.url, {
       method: "POST",
       headers: this.headers,

@@ -1,4 +1,5 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import type { TextResourceContents } from "@modelcontextprotocol/sdk/types.js"
 
 const CSP_POLICY = [
   "default-src 'none'",
@@ -11,10 +12,15 @@ const CSP_POLICY = [
 
 const CSP_META = `<meta http-equiv="Content-Security-Policy" content="${CSP_POLICY}">`
 
+/** Type guard for a text resource content (distinct from blob content). */
+function isTextContent(content: unknown): content is TextResourceContents {
+  return typeof content === "object" && content !== null && "text" in content
+}
+
 /** Reads a ui:// resource and returns its HTML text, rejecting anything that is not text/html. */
 export async function readUiResource(client: Client, uri: string): Promise<string> {
   const result = await client.readResource({ uri })
-  const content = result.contents.find((content) => typeof content.text === "string")
+  const content = result.contents.find(isTextContent)
   if (!content) throw new Error(`ui resource ${uri} returned no text content`)
   if (content.mimeType !== "text/html") {
     throw new Error(`ui resource ${uri} has mimeType ${content.mimeType ?? "(none)"}, expected text/html`)
