@@ -1301,6 +1301,18 @@ export default function Page() {
     </div>
   )
 
+  // 当首次出现 MCP App UI 时，自动展开侧面板
+  createEffect(
+    on(
+      () => mcpApps().length,
+      (count, prev) => {
+        if (prev === undefined && count > 0) {
+          if (!view().reviewPanel.opened()) view().reviewPanel.open()
+        }
+      },
+    ),
+  )
+
   const reviewPanel = () => (
     <div
       classList={{
