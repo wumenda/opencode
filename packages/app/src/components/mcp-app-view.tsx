@@ -99,14 +99,23 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     else if (event.type === "tool-progress") {
       // 标准 MCP progress 通知透传进 iframe：AppBridge 无专用发送方法，
       // 直接用底层 PostMessageTransport 发 notifications/progress（iframe 侧 mcpApp 已解析）。
-      if (!appTransport) return
+      if (!appTransport) {
+        console.log("[mcp-app] tool-progress dropped: appTransport missing", event)
+        return
+      }
       const params: Record<string, unknown> = { progress: event.progress }
       if (event.total !== undefined) params["total"] = event.total
       if (event.message !== undefined) params["message"] = event.message
+      // uiEvent 扩展字段透传进 iframe（iframe 侧从 progress.uiEvent.<key> 读取逐步渲染数据）。
+      // Solid store 的响应式 Proxy 无法被 postMessage 结构化克隆（DataCloneError），
+      // 先反序列化为纯对象再发送；MCP progress params 始终是 JSON 数据，JSON 往返安全。
+      if (event.uiEvent !== undefined) params["uiEvent"] = JSON.parse(JSON.stringify(event.uiEvent))
+      console.log("[mcp-app] tool-progress forward", { progress: event.progress, hasUiEvent: event.uiEvent !== undefined })
       void appTransport.send({ jsonrpc: "2.0", method: "notifications/progress", params })
     }
   }
   const handleEvent: McpAppSink = (event) => {
+    console.log(`[mcp-app] handleEvent type=${event.type} bridge=${!!bridge} init=${appInitialized} pending=${pending.length} key=${appKey()}`)
     if (!bridge || !appInitialized) {
       pending.push(event)
       return
@@ -120,19 +129,29 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   // 按 sessionID:server/resourceUri 在宿主注册表注册/注销本 App 的 sink，接收运行中/完成的工具事件。
   // sessionID 前缀用于跨 session 隔离：不同会话的同一 ui:// App 使用不同 key，互不串扰。
   const appKey = () => `${props.sessionID ? `${props.sessionID}:` : ""}${props.server}/${props.resourceUri}` as AppKey
-  // appKey（sessionID 或 server/resourceUri）变化时重注册：切换 session 后旧 key 注销、pending 清空，
-  // 确保只接收当前会话的事件。
+  // appKey（sessionID:server/resourceUri）或 resourceUri 变化时：
+  // 1) resourceUri 变化（如侧栏面板在 step1/step3 间切换 tab 复用本组件）先同步重载 iframe——
+  //    start() 立即清空旧 bridge / appInitialized，避免 host.register 重放的 lastProgress 被
+  //    forward 到旧 bridge 而丢失（这是切换 tool tab 后进度回退 0% 的根因）。
+  // 2) 再重注册 sink：切换 session 后旧 key 注销、pending 清空，重放此时进入 pending，
+  //    待新 iframe oninitialized 后冲刷恢复最终进度。
   let registeredKey: string | undefined
+  let lastResourceKey: string | undefined
   createEffect(() => {
+    const resourceKey = `${props.server}/${props.resourceUri}`
+    if (resourceKey !== lastResourceKey) {
+      lastResourceKey = resourceKey
+      void start()
+    }
     const key = appKey()
     if (key === registeredKey) return
+    console.log("[mcp-app] register", { key, server: props.server, resourceUri: props.resourceUri, sessionID: props.sessionID })
     unregister?.()
     pending.length = 0
     unregister = host.register(key, handleEvent)
     registeredKey = key
   })
   onMount(() => {
-    void start()
     // 宿主容器尺寸变化时实时推送 hostContext（避免首帧容器尚未布局导致尺寸为 0）。
     if (typeof ResizeObserver !== "undefined" && containerRef) {
       resizeObserver = new ResizeObserver(onResize)
@@ -160,6 +179,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     client = undefined
     revoke?.()
     revoke = undefined
+    appInitialized = false
     setBlobUrl()
     setAllow("")
     setPhase("loading")
@@ -274,11 +294,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       next.oncreatesamplingmessage = async (params) => props.onSampling!(params)
     }
     next.oninitialized = () => {
-      // App 就绪后标记已初始化并回放 fallbackData（契约 1）。
-      // 须在此处也冲刷 pending：running 阶段推送的 tool-progress 可能在 connect 返回
-      // 之前入 pending，而此时 host 的手势（ui/initialize 往返）往往晚于 connect 完成，
-      // 导致下方 connect 之后那一次 drainPending 已跑完而拿不到这些事件（进度卡住）。
-      // bridge 未就绪时 forward 为无害 no-op，故此处只在 bridge 已赋值时才能真正转发。
+      console.log(`[mcp-app] oninitialized bridge=${!!bridge} appInitializedBefore=${appInitialized} pendingLen=${pending.length}`)
       appInitialized = true
       if (props.fallbackData) void next.sendToolResult(props.fallbackData)
       if (bridge) drainPending()
