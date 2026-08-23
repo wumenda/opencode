@@ -9,14 +9,15 @@ export type SkillAppGroup = {
 
 const DIRECT_GROUP_KEY = "\u0000"
 
-/** 以 skill::server::resourceUri 去重后，把带 skill 标记者分组成 skill→tools 两级结构，保持首次出现顺序。 */
+/** 以 skill::instanceID 为去重键：同一调用实例（part.id）合并，不同实例各自成条，
+ *  保留首次出现顺序。同一 server/resourceUri 的多次调用不再合并（调用链展示）。 */
 export function buildSkillAppGroups(labeled: McpAppInfo[]): SkillAppGroup[] {
   const groups: SkillAppGroup[] = []
   const groupIndex = new Map<string, number>()
   const seen = new Set<string>()
   for (const app of labeled) {
     const groupKey = app.skill ?? DIRECT_GROUP_KEY
-    const seenKey = `${groupKey}::${app.server}::${app.resourceUri}`
+    const seenKey = `${groupKey}::${app.instanceID}`
     if (seen.has(seenKey)) continue
     seen.add(seenKey)
     let index = groupIndex.get(groupKey)
@@ -31,7 +32,7 @@ export function buildSkillAppGroups(labeled: McpAppInfo[]): SkillAppGroup[] {
 }
 
 export function toolTabId(app: McpAppInfo): string {
-  return `${app.server}::${app.resourceUri}`
+  return `${app.server}::${app.resourceUri}::${app.instanceID}`
 }
 
 export function createMcpAppsPanelState() {
