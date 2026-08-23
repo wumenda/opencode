@@ -575,12 +575,16 @@ test.describe("MCP Apps Panel", () => {
     await expect(panel.getByRole("tab", { name: /step1 #1/ })).toBeVisible()
     await expect(panel.getByRole("tab", { name: /step1 #2/ })).toBeVisible()
 
-    // 默认激活第一个实例：其 iframe 定格首次调用的进度
+    // 面板自动聚焦最新执行的实例（#2）：其 iframe 定格二次调用的进度（与 #1 隔离，互不串扰）。
     const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
     await expect(iframe).toBeVisible()
+    await expect(iframe.contentFrame().getByText("二次调用 4/5")).toBeVisible()
+
+    // 切到第一个实例：同一 iframe 容器重注册为该实例 sink，回放首次调用的进度（隔离生效）。
+    await panel.getByRole("tab", { name: /step1 #1/ }).click()
     await expect(iframe.contentFrame().getByText("首次调用 2/5")).toBeVisible()
 
-    // 切换到第二个实例：同一 iframe 容器重注册为该实例 sink，显示二次调用的进度
+    // 再切回第二个实例：进度互不串扰。
     await panel.getByRole("tab", { name: /step1 #2/ }).click()
     await expect(iframe.contentFrame().getByText("二次调用 4/5")).toBeVisible()
   })
