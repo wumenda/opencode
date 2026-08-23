@@ -476,6 +476,11 @@ const layer = Layer.effect(
         s.defs[name] = listed
         await bridge.promise(events.publish(ToolsChanged, { server: name }).pipe(Effect.ignore))
       })
+
+      // 非标准 notification 支持（SEP-1865 uiEvent 扩展字段）：SDK 严格解析会剥离
+      // notifications/progress params 中的 uiEvent，此处用宽松 schema 重注册，使
+      // uiEvent 能随 onprogress 回调写入 metadata.mcpProgress，最终转发进 iframe App。
+      McpCatalog.installUiEventNotificationHandlers(client)
     }
 
     function serverLog(name: string, params: LoggingMessageNotification["params"]) {

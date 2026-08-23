@@ -2,7 +2,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import {
   CallToolResultSchema,
   ListToolsResultSchema,
+  ProgressNotificationParamsSchema,
+  ProgressNotificationSchema,
   ToolSchema,
+  type Notification,
   type Tool as MCPToolDef,
 } from "@modelcontextprotocol/sdk/types.js"
 import { dynamicTool, jsonSchema, type JSONSchema7, type Tool } from "ai"
@@ -43,6 +46,36 @@ export interface McpProgress {
   progress: number
   total?: number
   message?: string
+  /** MCP Apps (SEP-1865) 扩展字段：MCP server 可在 notifications/progress 的 params 里
+   *  携带结构化 uiEvent 数据（如 pdf2json 的 send_progress_with_data），前端 step-ui 直接从
+   *  `progress.uiEvent.<key>` 读取逐步渲染所需数据。 */
+  uiEvent?: unknown
+}
+
+/**
+ * 松开 SDK 对 notifications/progress 的严格 zod 解析：SDK 的 ProgressNotificationParamsSchema
+ * 是 `z.object`（默认 strip），会把 params 里非标准的扩展字段（如 SEP-1865 的 uiEvent）剥离；
+ * `.loose()` 版保留全部扩展字段，使 uiEvent 能原样到达 convertTool 的 onprogress 回调。
+ */
+export const LooseProgressNotificationSchema = ProgressNotificationSchema.extend({
+  params: ProgressNotificationParamsSchema.loose(),
+})
+
+/** 转交 SDK 内置的 progressToken -> callTool onprogress 分发（保持 timeout reset 与 toolCallId 关联不变）。 */
+function dispatchProgress(client: Client, notification: Notification) {
+  return (client as unknown as { _onprogress: (notification: Notification) => void })._onprogress(notification)
+}
+
+/**
+ * 注册非标准 notification 处理（MCP Apps SEP-1865 uiEvent 扩展）：
+ * 1) 用宽松 schema 重注册 notifications/progress，uiEvent 不再被 SDK 剥离；
+ * 2) 兜底捕获未注册 method 的通知，凡携带 progressToken+uiEvent 的走标准进度管道。
+ * 直接替换 SDK 构造函数注册的内置 progress handler，行为一致（仅解析更宽松）。
+ */
+export function installUiEventNotificationHandlers(client: Client) {
+  client.setNotificationHandler(LooseProgressNotificationSchema, (notification) =>
+    dispatchProgress(client, notification as Notification),
+  )
 }
 
 /** MCP Apps (SEP-1865) UI metadata from a tool definition's `_meta`. */
@@ -104,7 +137,17 @@ export function convertTool(
           signal: options.abortSignal,
           timeout,
           // The MCP SDK only sends a progress token when this hook is present, enabling timeout resets.
-          onprogress: (p) => onProgress?.({ progress: p.progress, total: p.total, message: p.message }, options.toolCallId),
+          onprogress: (p) =>
+            onProgress?.(
+              {
+                progress: p.progress,
+                total: p.total,
+                message: p.message,
+                // SDK 的 Progress 类型不含扩展字段，但运行时 params 原样保留 uiEvent（透传）。
+                uiEvent: (p as { uiEvent?: unknown }).uiEvent,
+              },
+              options.toolCallId,
+            ),
         },
       )
       if (result.isError)
