@@ -29,6 +29,8 @@ export type McpAppViewProps = {
   resourceUri: string
   /** 归属会话：McpAppHost 事件按 sessionID 隔离（与 McpTool 的 push key 保持一致）。 */
   sessionID?: string
+  /** 调用实例标识（part.id）：与 McpTool 的 push key 保持一致，事件按实例隔离。 */
+  instanceID?: string
   /** Completed tool result (contract 1 metadata.mcp.result) replayed into the app after init. */
   fallbackData?: CallToolResult
   onError?: (message: string) => void
@@ -126,10 +128,11 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     while (pending.length) forward(pending.shift()!)
   }
 
-  // 按 sessionID:server/resourceUri 在宿主注册表注册/注销本 App 的 sink，接收运行中/完成的工具事件。
-  // sessionID 前缀用于跨 session 隔离：不同会话的同一 ui:// App 使用不同 key，互不串扰。
-  const appKey = () => `${props.sessionID ? `${props.sessionID}:` : ""}${props.server}/${props.resourceUri}` as AppKey
-  // appKey（sessionID:server/resourceUri）或 resourceUri 变化时：
+  // 按 sessionID:server/resourceUri:instanceID 在宿主注册表注册/注销本 App 的 sink。
+  // sessionID 前缀隔离跨会话；instanceID 后缀隔离同资源的多实例调用（调用链展示）。
+  const appKey = () =>
+    `${props.sessionID ? `${props.sessionID}:` : ""}${props.server}/${props.resourceUri}${props.instanceID ? `:${props.instanceID}` : ""}` as AppKey
+  // appKey（sessionID:server/resourceUri:instanceID）或 resourceUri 变化时：
   // 1) resourceUri 变化（如侧栏面板在 step1/step3 间切换 tab 复用本组件）先同步重载 iframe——
   //    start() 立即清空旧 bridge / appInitialized，避免 host.register 重放的 lastProgress 被
   //    forward 到旧 bridge 而丢失（这是切换 tool tab 后进度回退 0% 的根因）。
