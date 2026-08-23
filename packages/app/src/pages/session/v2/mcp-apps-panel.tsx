@@ -62,7 +62,7 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
     return group.apps.find((app) => toolTabId(app) === state.activeTool()) ?? group.apps[0]
   })
 
-  const selectTool = (app: { server: string; resourceUri: string }) => state.setActiveTool(toolTabId(app))
+  const selectTool = (app: McpAppInfo) => state.setActiveTool(toolTabId(app))
 
   return (
     <div data-component="mcp-apps-panel" class="flex h-full flex-col overflow-hidden bg-v2-background-bg-base contain-strict">
@@ -112,7 +112,7 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
         <Show when={(activeGroup()?.apps.length ?? 0) > 0}>
           <div class="flex shrink-0 items-center gap-1 border-b border-v2-border-border-base bg-v2-background-bg-layer-01 px-2">
             <For each={activeGroup()!.apps}>
-              {(app) => {
+              {(app, index) => {
                 const isActive = () => toolTabId(app) === state.activeTool()
                 return (
                   <button
@@ -127,7 +127,10 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
                     onClick={() => selectTool(app)}
                   >
                     <Icon name="mcp" class="size-3" />
-                    <span>{app.resourceUri}</span>
+                    <span>{app.toolName ?? app.resourceUri}</span>
+                    <span class="ml-1 rounded-full bg-v2-background-bg-layer-01 px-1.5 text-11-regular text-v2-text-text-muted">
+                      #{index() + 1}
+                    </span>
                   </button>
                 )
               }}
@@ -148,7 +151,13 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
             }
           >
             {(app) => (
-              <McpAppView server={app().server} resourceUri={app().resourceUri} sessionID={props.sessionID} fillHeight />
+              <McpAppView
+                server={app().server}
+                resourceUri={app().resourceUri}
+                sessionID={props.sessionID}
+                instanceID={app().instanceID}
+                fillHeight
+              />
             )}
           </Show>
         </div>
