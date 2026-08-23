@@ -455,6 +455,8 @@ export const dict = {
   "mcp.app.panel.empty": "没有可用的 MCP 应用程序",
   "mcp.app.panel.title": "应用程序",
   "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
+  "mcp.app.panel.direct": "直接调用",
+  "mcp.app.panel.noUiTools": "该 skill 未产生带 UI 的工具",
   "mcp.status.disabled": "已禁用",
 
   "dialog.fork.empty": "没有可用于创建新会话的消息",

@@ -342,6 +342,8 @@ export const dict = {
   "mcp.app.panel.empty": "No MCP apps available",
   "mcp.app.panel.title": "Apps",
   "mcp.app.panel.tabLabel": "{{server}} / {{tool}}",
+  "mcp.app.panel.direct": "Direct",
+  "mcp.app.panel.noUiTools": "This skill produced no UI tools",
 
   "dialog.fork.empty": "No messages to fork from",
 
