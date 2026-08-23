@@ -58,6 +58,15 @@ const STEP_UI_HTML = `<!doctype html>
           send({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} })
           return
         }
+        // 工具入参/结果也渲染进 #out，用于断言宿主透传（载荷均为 JSON 数据）。
+        if (d.method === "ui/notifications/tool-input-partial" && d.params && d.params.arguments) {
+          out.textContent = "input:" + JSON.stringify(d.params.arguments)
+          return
+        }
+        if (d.method === "ui/notifications/tool-result" && d.params) {
+          out.textContent = "result:" + (d.params.isError ? "error" : "ok")
+          return
+        }
         if (d.method === "notifications/progress" && d.params) render(d.params)
       })
       setInterval(tryHandshake, 300)
@@ -223,13 +232,13 @@ test.describe("MCP Apps Panel", () => {
     await expect(skillTab).toBeVisible()
     await expect(skillTab.getByText("2", { exact: true })).toBeVisible()
 
-    // 二级：两个 tool 子标签（以 resourceUri 为文本）
-    await expect(panel.getByRole("tab", { name: "ui://step1/progress.html" })).toBeVisible()
-    await expect(panel.getByRole("tab", { name: "ui://step2/progress.html" })).toBeVisible()
+    // 二级：两个 tool 子标签（工具名 + 调用序号）
+    await expect(panel.getByRole("tab", { name: /step1 #1/ })).toBeVisible()
+    await expect(panel.getByRole("tab", { name: /step2 #2/ })).toBeVisible()
 
     // 切换 sub-tab 更新激活态
-    await panel.getByRole("tab", { name: "ui://step2/progress.html" }).click()
-    await expect(panel.getByRole("tab", { name: "ui://step2/progress.html" })).toHaveAttribute("aria-selected", "true")
+    await panel.getByRole("tab", { name: /step2 #2/ }).click()
+    await expect(panel.getByRole("tab", { name: /step2 #2/ })).toHaveAttribute("aria-selected", "true")
   })
 
   test("forwards running tool progress into the step-ui iframe", async ({ page }) => {
@@ -304,6 +313,69 @@ test.describe("MCP Apps Panel", () => {
     await expect(frame.getByText("uiEvent:images_loaded")).toBeVisible()
   })
 
+  test("forwards tool input arguments into the step-ui iframe", async ({ page }) => {
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_in", "skill", "completed", { name: "pfd-topology" }),
+          toolPart("prt_in", "ui-server_pfd_topology", "running", { pdf_path: "PFD.pdf", dpi: 150 }, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "pfd_topology",
+                ui: { resourceUri: "ui://pfd-topology/review.html", visibility: ["model", "app"] },
+              },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://pfd-topology/review.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // running 工具的入参经 ui/notifications/tool-input-partial 透传进 iframe，step-ui 渲染 arguments。
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe).toBeVisible()
+    const frame = iframe.contentFrame()
+    await expect(frame.getByText('input:{"pdf_path":"PFD.pdf","dpi":150}')).toBeVisible()
+  })
+
+  test("forwards tool result into the step-ui iframe", async ({ page }) => {
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_res", "skill", "completed", { name: "pfd-topology" }),
+          toolPart("prt_res", "ui-server_pfd_topology", "completed", { pdf_path: "PFD.pdf" }, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "pfd_topology",
+                ui: { resourceUri: "ui://pfd-topology/review.html", visibility: ["model", "app"] },
+                result: { content: [{ type: "text", text: "done" }] },
+              },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://pfd-topology/review.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // completed 工具的 metadata.mcp.result 经 ui/notifications/tool-result 透传进 iframe。
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe).toBeVisible()
+    const frame = iframe.contentFrame()
+    await expect(frame.getByText("result:ok")).toBeVisible()
+  })
+
   test("switches the panel tab to the newest tool when a new tool executes", async ({ page }) => {
     const timeline = await setupTimeline(page, {
       settings: { newLayoutDesigns: true },
@@ -329,7 +401,7 @@ test.describe("MCP Apps Panel", () => {
     await expect(panel).toBeVisible()
 
     // 初始只有 step1：面板选中 step1 的 tab。
-    await expect(panel.getByRole("tab", { name: "ui://step1/progress.html" })).toHaveAttribute(
+    await expect(panel.getByRole("tab", { name: /step1 #1/ })).toHaveAttribute(
       "aria-selected",
       "true",
     )
@@ -349,7 +421,7 @@ test.describe("MCP Apps Panel", () => {
       ),
     )
 
-    await expect(panel.getByRole("tab", { name: "ui://step2/progress.html" })).toHaveAttribute(
+    await expect(panel.getByRole("tab", { name: /step2 #2/ })).toHaveAttribute(
       "aria-selected",
       "true",
     )
@@ -417,12 +489,12 @@ test.describe("MCP Apps Panel", () => {
     await expect(panel).toBeVisible()
 
     // 初始选中最新执行的 step3 → iframe 渲染 Step Three。
-    await expect(panel.getByRole("tab", { name: "ui://step3/progress.html" })).toHaveAttribute("aria-selected", "true")
+    await expect(panel.getByRole("tab", { name: /step3 #2/ })).toHaveAttribute("aria-selected", "true")
     const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
     await expect(iframe.contentFrame().getByText("Step Three")).toBeVisible()
 
     // 切换到 step1 → iframe 必须重新加载出 Step One，而不是残留 Step Three 的 HTML。
-    await panel.getByRole("tab", { name: "ui://step1/progress.html" }).click()
+    await panel.getByRole("tab", { name: /step1 #1/ }).click()
     await expect(iframe.contentFrame().getByText("Step One")).toBeVisible()
     await expect(iframe.contentFrame().getByText("Step Three")).not.toBeVisible()
   })
@@ -463,13 +535,54 @@ test.describe("MCP Apps Panel", () => {
     await expect(panel).toBeVisible()
 
     // 初始选中最新执行的 step3：iframe 必须回放完成态持久化的最终进度。
-    await expect(panel.getByRole("tab", { name: "ui://step3/progress.html" })).toHaveAttribute("aria-selected", "true")
+    await expect(panel.getByRole("tab", { name: /step3 #2/ })).toHaveAttribute("aria-selected", "true")
     const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
     await expect(iframe.contentFrame().getByText("步骤三：结果汇总 5/5")).toBeVisible()
 
     // 切回 step1 tab：iframe 重载后必须回放 step1 的最终进度，而非回退到 "就绪"。
-    await panel.getByRole("tab", { name: "ui://step1/progress.html" }).click()
+    await panel.getByRole("tab", { name: /step1 #1/ }).click()
     await expect(iframe.contentFrame().getByText("步骤一：解析输入 5/5")).toBeVisible()
+  })
+
+  test("shows each call instance as its own tab with isolated progress", async ({ page }) => {
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_dup", "skill", "completed", { name: "step-12" }),
+          toolPart("prt_step1_first", "ui-server_step1", "running", {}, {
+            metadata: {
+              mcp: { server: "ui-server", tool: "step1", ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] } },
+              mcpProgress: { progress: 2, total: 5, message: "首次调用 2/5" },
+            },
+          }),
+          toolPart("prt_step1_second", "ui-server_step1", "running", {}, {
+            metadata: {
+              mcp: { server: "ui-server", tool: "step1", ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] } },
+              mcpProgress: { progress: 4, total: 5, message: "二次调用 4/5" },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://step1/progress.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // 同一 tool 两次调用 → 两个带序号的二级 tab（调用链）
+    await expect(panel.getByRole("tab", { name: /step1 #1/ })).toBeVisible()
+    await expect(panel.getByRole("tab", { name: /step1 #2/ })).toBeVisible()
+
+    // 默认激活第一个实例：其 iframe 定格首次调用的进度
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe).toBeVisible()
+    await expect(iframe.contentFrame().getByText("首次调用 2/5")).toBeVisible()
+
+    // 切换到第二个实例：同一 iframe 容器重注册为该实例 sink，显示二次调用的进度
+    await panel.getByRole("tab", { name: /step1 #2/ }).click()
+    await expect(iframe.contentFrame().getByText("二次调用 4/5")).toBeVisible()
   })
 
   test("shows empty state when no MCP apps", async ({ page }) => {
