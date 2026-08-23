@@ -50,11 +50,15 @@ from .duck_implement import (
 from .server import get_host_client
 from .resources import (
     COMPOSITION_TABLE_UI_URI,
+    DEMO_PROGRESS_UI_URI,
     EQUIPMENT_ASSEMBLY_UI_URI,
     PFD_REFLUX_UI_URI,
     PFD_TOPOLOGY_UI_URI,
     PLANT_UNIT_UI_URI,
     PROCESS_PACKAGE_UI_URI,
+    STEP1_UI_URI,
+    STEP2_UI_URI,
+    STEP3_UI_URI,
 )
 
 logger = get_logger(__name__)
@@ -1390,6 +1394,85 @@ async def submit_review(
     return {"status": "ok", "review_id": review_id, "approved": approved}
 
 
+# ---------------------------------------------------------------------------
+# step1 / step2 / step3：确定性演示工具（无 PDF/VLM）。
+# 每个 step 逐步推送 notifications/progress，宿主把进度映射到运行中 tool part 的
+# metadata.mcpProgress，前端时间线工具卡与 step-ui（共享 UI，__MCP_TOOL_NAME__ 区分）
+# 据此渲染实时进度条。用于编排 skill 时验证「skill→tool 两层 Tab + 进度 UI」链路。
+# ---------------------------------------------------------------------------
+_STEP_TITLES: dict[str, str] = {
+    "step1": "步骤一：解析输入",
+    "step2": "步骤二：特征提取",
+    "step3": "步骤三：结果汇总",
+}
+
+
+async def _run_step(ctx: Context, step: str, iterations: int, message: str) -> dict[str, Any]:
+    """逐步推送进度的公共实现。steps 范围 [1, 20]，每步间隔 350ms。"""
+    await ctx.info(f"{step} start: iterations={iterations}")
+    iterations = max(1, min(int(iterations), 20))
+    title = _STEP_TITLES.get(step, step)
+    for i in range(1, iterations + 1):
+        await ctx.report_progress(
+            progress=float(i),
+            total=float(iterations),
+            message=f"{message or title} {i}/{iterations}",
+        )
+        if i < iterations:
+            await asyncio.sleep(0.35)
+    return {
+        "status": "success",
+        "workflow": step,
+        "step": step,
+        "title": title,
+        "iterations": iterations,
+        "note": f"{title}完成，进度通知已推送",
+    }
+
+
+async def step1(ctx: Context, iterations: int = 5, message: str = "") -> dict[str, Any]:
+    """step1：解析输入。确定性演示工具，逐步推送进度通知并绑定进度 UI。
+
+    【职责】
+    模拟流程第一步（如「解析输入」）。按 iterations 步循环推送
+    ``notifications/progress``，宿主映射到 tool part 的 ``metadata.mcpProgress``，
+    前端时间线工具卡与共享 step-ui（ui://step1/progress.html）实时渲染进度。
+    不依赖 PDF 与 VLM，可独立、确定性执行，用于编排演示与链路校验。
+
+    【参数说明】
+    Args:
+        iterations: 进度步数，默认 5。范围 [1, 20]。
+        message: 进度消息前缀，默认使用内置步骤标题。
+
+    【返回结果】
+    Returns:
+        dict[str, Any]，含 status / workflow / step / title / iterations。
+    """
+    return await _run_step(ctx, "step1", iterations, message)
+
+
+async def step2(ctx: Context, iterations: int = 5, message: str = "") -> dict[str, Any]:
+    """step2：特征提取。确定性演示工具，逐步推送进度通知并绑定进度 UI。
+
+    【职责】模拟流程第二步（如「特征提取」），行为同 :func:`step1`。
+    绑定 UI 资源 ui://step2/progress.html。
+
+    【参数说明】同 step1。
+    """
+    return await _run_step(ctx, "step2", iterations, message)
+
+
+async def step3(ctx: Context, iterations: int = 5, message: str = "") -> dict[str, Any]:
+    """step3：结果汇总。确定性演示工具，逐步推送进度通知并绑定进度 UI。
+
+    【职责】模拟流程第三步（如「结果汇总」），行为同 :func:`step1`。
+    绑定 UI 资源 ui://step3/progress.html。
+
+    【参数说明】同 step1。
+    """
+    return await _run_step(ctx, "step3", iterations, message)
+
+
 def register_tools(mcp: FastMCP) -> None:
     """将 tools 模块中的工具注册到给定的 FastMCP 实例。
 
@@ -1406,7 +1489,11 @@ def register_tools(mcp: FastMCP) -> None:
     mcp.tool(meta={"ui": {"resourceUri": EQUIPMENT_ASSEMBLY_UI_URI}}, timeout=7200)(equipment_assembly)
     mcp.tool(meta={"ui": {"resourceUri": PFD_REFLUX_UI_URI}}, timeout=7200)(pfd_reflux)
     mcp.tool(meta={"ui": {"resourceUri": COMPOSITION_TABLE_UI_URI}}, timeout=7200)(composition_table)
-    mcp.tool()(demo_progress)
+    mcp.tool(meta={"ui": {"resourceUri": DEMO_PROGRESS_UI_URI}})(demo_progress)
+    # step 演示工具：绑定共享 step-ui 的三套不同 URI，保持同一 skill 下各自独立成 tab。
+    mcp.tool(meta={"ui": {"resourceUri": STEP1_UI_URI}})(step1)
+    mcp.tool(meta={"ui": {"resourceUri": STEP2_UI_URI}})(step2)
+    mcp.tool(meta={"ui": {"resourceUri": STEP3_UI_URI}})(step3)
     mcp.tool(meta={"ui": {"visibility": ["app"]}})(read_image)
     mcp.tool(meta={"ui": {"visibility": ["app"]}})(read_pdf)
     mcp.tool(meta={"ui": {"visibility": ["app"]}})(submit_review)

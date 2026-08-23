@@ -22,6 +22,12 @@ EQUIPMENT_ASSEMBLY_UI_URI = "ui://equipment-assembly/review.html"
 PROCESS_PACKAGE_UI_URI = "ui://process-package/review.html"
 PFD_REFLUX_UI_URI = "ui://pfd-reflux/review.html"
 COMPOSITION_TABLE_UI_URI = "ui://composition-table/review.html"
+DEMO_PROGRESS_UI_URI = "ui://demo-progress/progress.html"
+# step1/step2/step3 三个演示 tool 共用一个 UI 构建（scope=step），以不同 URI 区分，避免前端按
+# skill::server::resourceUri 去重时被合并成单个 tool tab。
+STEP1_UI_URI = "ui://step1/progress.html"
+STEP2_UI_URI = "ui://step2/progress.html"
+STEP3_UI_URI = "ui://step3/progress.html"
 
 UI_MIME = "text/html;profile=mcp-app"
 # 自包含 HTML（Vite 单文件构建，无外部 src/href），CSP 声明为空 allowlist。
@@ -38,6 +44,12 @@ _UI_RESOURCES: list[tuple[str, str, str, str, str]] = [
     (PROCESS_PACKAGE_UI_URI, "process-package-review-ui", "工艺包章节提取的审核 UI（匹配章节表+工序说明/反应方程式编辑）", "process_package", "process-package"),
     (PFD_REFLUX_UI_URI, "pfd-reflux-review-ui", "PFD 回流结构审核 UI（塔/反应器回流判断+冷凝器/再沸器+操作条件）", "pfd_reflux", "pfd-reflux"),
     (COMPOSITION_TABLE_UI_URI, "composition-table-review-ui", "组分表提取审核 UI（组分列表+物流组成+流量/温度/压力）", "composition_table", "composition-table"),
+    (DEMO_PROGRESS_UI_URI, "demo-progress-ui", "demo_progress 进度展示 UI（接收 notifications/progress 实时渲染进度条）", "demo_progress", "demo-progress"),
+    # step1/step2/step3 共用一个 shared step-ui（scope=step，读同一份 dist/index.html），
+    # 仅 tool_name（注入 __MCP_TOOL_NAME__）不同，用以在 UI 内区分当前步骤。
+    (STEP1_UI_URI, "step1-ui", "step1 步骤演示 UI（带进度通知）", "step1", "step"),
+    (STEP2_UI_URI, "step2-ui", "step2 步骤演示 UI（带进度通知）", "step2", "step"),
+    (STEP3_UI_URI, "step3-ui", "step3 步骤演示 UI（带进度通知）", "step3", "step"),
 ]
 
 

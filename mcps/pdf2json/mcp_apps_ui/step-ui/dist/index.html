@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Step Progress</title>
+    <!-- _get_ui_html 会在此 <head> 注入 <script>window.__MCP_TOOL_NAME__=...</script> -->
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #1f2328;
+        --muted: #59636e;
+        --track: #e6e9ec;
+        --fill: #64748b;
+        --accent: #0969da;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111418;
+          --fg: #e6e9ec;
+          --muted: #8b949e;
+          --track: #21262d;
+          --fill: #30363d;
+          --accent: #4493f8;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .card {
+        border: 1px solid var(--track);
+        border-radius: 10px;
+        padding: 14px 14px 16px;
+      }
+      .step-name {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0 0 10px;
+      }
+      .track {
+        height: 10px;
+        background: var(--track);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent), var(--fill));
+        border-radius: 999px;
+        transition: width 200ms ease;
+      }
+      .meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .msg {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+        min-height: 1em;
+      }
+      .done {
+        color: var(--accent);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2 class="step-name" data-step-name>Step</h2>
+      <div class="track"><div class="fill" data-fill></div></div>
+      <div class="meta">
+        <span data-percent>0%</span>
+        <span data-count>0 / 0</span>
+      </div>
+      <div class="msg" data-msg>等待进度通知…</div>
+    </div>
+    <script>
+      // 步骤名优先取宿主注入的 __MCP_TOOL_NAME__，否则回退到 location（供纯静态预览）。
+      function stepName() {
+        const injected = window.__MCP_TOOL_NAME__
+        if (typeof injected === "string" && injected) return injected
+        return decodeURIComponent(location.pathname.split("/").pop() || "step")
+      }
+      const nameEl = document.querySelector("[data-step-name]")
+      const fillEl = document.querySelector("[data-fill]")
+      const pctEl = document.querySelector("[data-percent]")
+      const cntEl = document.querySelector("[data-count]")
+      const msgEl = document.querySelector("[data-msg]")
+      nameEl.textContent = stepName().replace(/_/g, " ")
+
+      function setProgress(params) {
+        const progress = Number(params.progress ?? 0)
+        const total = Number(params.total ?? 0)
+        const message = typeof params.message === "string" ? params.message : ""
+        const percent = total > 0 ? Math.round((progress / total) * 100) : 0
+        if (fillEl) fillEl.style.width = percent + "%"
+        if (pctEl) pctEl.textContent = percent + "%"
+        if (cntEl) cntEl.textContent = progress + " / " + total
+        if (msgEl) msgEl.textContent = message || ""
+      }
+
+      window.addEventListener("message", (event) => {
+        const data = event.data
+        if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") return
+        if (data.method === "notifications/progress" && data.params) {
+          setProgress(data.params)
+        }
+      })
+
+      // 初始占位
+      setProgress({ progress: 0, total: 1, message: "就绪" })
+    </script>
+  </body>
+</html>
