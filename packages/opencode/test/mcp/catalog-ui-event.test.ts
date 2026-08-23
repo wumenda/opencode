@@ -61,4 +61,11 @@ describe("MCP non-standard uiEvent notifications", () => {
     expect(received[0]).toMatchObject({ progress: 1, total: 2, message: "working" })
     expect(received[0].uiEvent).toEqual({ event_type: "images_loaded", image_paths: ["a.png"] })
   })
+
+  test("routes uiEvent-carrying custom notification methods through the progress pipeline", async () => {
+    const received = await run("ui/notifications/step-update")
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatchObject({ progress: 1, total: 2, message: "working" })
+    expect(received[0].uiEvent).toEqual({ event_type: "images_loaded", image_paths: ["a.png"] })
+  })
 })

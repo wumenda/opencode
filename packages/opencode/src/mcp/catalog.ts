@@ -76,6 +76,15 @@ export function installUiEventNotificationHandlers(client: Client) {
   client.setNotificationHandler(LooseProgressNotificationSchema, (notification) =>
     dispatchProgress(client, notification as Notification),
   )
+  // 兜底捕获未注册 method 的非标准通知：凡携带 progressToken + uiEvent 的，
+  // 视为扩展 progress 通知走同一条进度管道（与 notifications/progress 行为一致）。
+  client.fallbackNotificationHandler = async (notification) => {
+    const params = notification.params
+    if (params === undefined || params === null || typeof params !== "object") return
+    if ("progressToken" in params && "uiEvent" in params) {
+      dispatchProgress(client, notification)
+    }
+  }
 }
 
 /** MCP Apps (SEP-1865) UI metadata from a tool definition's `_meta`. */
