@@ -1195,7 +1195,61 @@ async def composition_table(
 
 
 # ---------------------------------------------------------------------------
-# Tool 8: read_image（app-only，供 UI 读取图片做背景图）
+# Tool 8: demo_progress（演示/验证进度推送链路，无需 PDF 与 VLM）
+# ---------------------------------------------------------------------------
+async def demo_progress(
+    ctx: Context,
+    steps: int = 5,
+    delay_ms: int = 500,
+    message: str = "处理中",
+) -> dict[str, Any]:
+    """逐步推送 MCP 进度通知的演示工具，用于验证前端进度条（mcpProgress）渲染。
+
+    【职责】
+    按 ``steps`` 步循环，每步通过标准 ``notifications/progress`` 推送
+    ``progress`` / ``total`` / ``message``；后端把进度映射到运行中工具 part 的
+    ``metadata.mcpProgress``，前端时间线工具卡据此渲染进度条。
+
+    【使用场景】
+    何时调用:
+    - 需要验证/演示 MCP 进度推送链路（MCP server -> 后端 -> 前端进度条）时。
+    - 不依赖 PDF 与 VLM，可独立、确定性执行。
+
+    何时不调用:
+    - 任何真实图纸分析任务（请调用 pfd_topology 等业务工具）。
+
+    【参数说明】
+    Args:
+        steps: 进度步数，默认 5。范围 [1, 20]。
+        delay_ms: 每步间隔毫秒，默认 500。范围 [10, 5000]。
+        message: 进度消息前缀，默认 "处理中"。最终显示为 ``<message> i/steps``。
+
+    【返回结果】
+    Returns:
+        dict[str, Any]，含 status / workflow / steps / message。
+    """
+    await ctx.info(f"demo_progress start: steps={steps}, delay_ms={delay_ms}")
+    steps = max(1, min(int(steps), 20))
+    delay_ms = max(10, min(int(delay_ms), 5000))
+    for step in range(1, steps + 1):
+        await ctx.report_progress(
+            progress=float(step),
+            total=float(steps),
+            message=f"{message} {step}/{steps}",
+        )
+        if step < steps:
+            await asyncio.sleep(delay_ms / 1000.0)
+    return {
+        "status": "success",
+        "workflow": "demo_progress",
+        "steps": steps,
+        "message": message,
+        "note": "演示工具：进度推送完成",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 9: read_image（app-only，供 UI 读取图片做背景图）
 # ---------------------------------------------------------------------------
 _IMAGE_MIME = {
     ".png": "image/png",
@@ -1352,6 +1406,7 @@ def register_tools(mcp: FastMCP) -> None:
     mcp.tool(meta={"ui": {"resourceUri": EQUIPMENT_ASSEMBLY_UI_URI}}, timeout=7200)(equipment_assembly)
     mcp.tool(meta={"ui": {"resourceUri": PFD_REFLUX_UI_URI}}, timeout=7200)(pfd_reflux)
     mcp.tool(meta={"ui": {"resourceUri": COMPOSITION_TABLE_UI_URI}}, timeout=7200)(composition_table)
+    mcp.tool()(demo_progress)
     mcp.tool(meta={"ui": {"visibility": ["app"]}})(read_image)
     mcp.tool(meta={"ui": {"visibility": ["app"]}})(read_pdf)
     mcp.tool(meta={"ui": {"visibility": ["app"]}})(submit_review)

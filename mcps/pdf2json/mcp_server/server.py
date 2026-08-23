@@ -57,6 +57,7 @@ from .resources import (
 )
 from .tools import (
     composition_table,
+    demo_progress,
     equipment_assembly,
     pfd_reflux,
     pfd_topology,

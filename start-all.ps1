@@ -1,5 +1,14 @@
-# 启动 opencode 前端、后端和 pdf2json MCP 服务
+﻿# 启动 opencode 前端、后端和 pdf2json MCP 服务
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# bun 在 PATH 上可能是 .ps1 shim（Start-Process 无法执行），显式解析真实 bun.exe
+$bunExe = Get-Command bun.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+if (-not $bunExe -or -not (Test-Path $bunExe)) {
+    $bunExe = Join-Path $env:USERPROFILE ".bun\bin\bun.exe"
+}
+if (-not (Test-Path $bunExe)) {
+    Write-Error "未找到 bun.exe，请安装 Bun 或把 bun 加入 PATH"; exit 1
+}
 
 # 停止占用端口的旧进程
 foreach ($port in 4096, 4444, 8000) {
@@ -12,12 +21,12 @@ foreach ($port in 4096, 4444, 8000) {
 }
 
 # 启动后端
-Start-Process -FilePath "bun" -ArgumentList "run", "--conditions=browser", "./src/index.ts", "serve", "--port", "4096" `
+Start-Process -FilePath $bunExe -ArgumentList "run", "--conditions=browser", "./src/index.ts", "serve", "--port", "4096" `
     -WorkingDirectory (Join-Path $repoRoot "packages\opencode") -WindowStyle Minimized
 Write-Host "后端启动中... (http://127.0.0.1:4096)"
 
 # 启动前端
-Start-Process -FilePath "bun" -ArgumentList "dev", "--", "--port", "4444" `
+Start-Process -FilePath $bunExe -ArgumentList "dev", "--", "--port", "4444" `
     -WorkingDirectory (Join-Path $repoRoot "packages\app") -WindowStyle Minimized
 Write-Host "前端启动中... (http://localhost:4444)"
 
