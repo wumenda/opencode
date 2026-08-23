@@ -111,13 +111,72 @@
         if (msgEl) msgEl.textContent = message || ""
       }
 
+      // ---- AppBridge iframe 侧握手 ----
+      // host 只有在收到本 iframe 的 ui/initialize 请求 + ui/notifications/initialized 通知后，
+      // 才把 tool-progress/tool-result 等事件转发进来（见 mcp-app-view.tsx handleEvent 的
+      // `bridge && appInitialized` 门控）。缺了握手，进度事件会被压入 pending 永不转发。
+      let nextId = 1
+      const pending = new Map()
+      let hostOrigin = "*"
+
+      function post(message) {
+        if (window.parent) window.parent.postMessage(message, hostOrigin)
+      }
+
+      function sendRequest(method, params) {
+        const id = nextId++
+        return new Promise((resolve, reject) => {
+          pending.set(id, { resolve, reject })
+          post({ jsonrpc: "2.0", id, method, params })
+          setTimeout(() => {
+            if (pending.has(id)) {
+              pending.delete(id)
+              reject(new Error(method + " 请求超时"))
+            }
+          }, 10000)
+        })
+      }
+
+      function sendNotification(method, params) {
+        post({ jsonrpc: "2.0", method, params })
+      }
+
       window.addEventListener("message", (event) => {
+        // 握手完成后只接受来自 hostOrigin 的消息
+        if (hostOrigin !== "*" && event.origin !== hostOrigin) return
         const data = event.data
         if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") return
+
+        // 响应：匹配在途请求
+        if (data.id != null && pending.has(Number(data.id))) {
+          if (hostOrigin === "*") hostOrigin = event.origin
+          const id = Number(data.id)
+          const p = pending.get(id)
+          pending.delete(id)
+          if (data.error) p.reject(new Error(data.error.message || "JSON-RPC error"))
+          else p.resolve(data.result)
+          return
+        }
+
+        // 通知
+        if (!data.method) return
+        if (hostOrigin === "*" && event.origin && event.origin !== "null") hostOrigin = event.origin
         if (data.method === "notifications/progress" && data.params) {
           setProgress(data.params)
         }
       })
+
+      // 启动：先建立握手，进度通知才会被 host 转发
+      sendRequest("ui/initialize", {
+        protocolVersion: "2025-06-18",
+        appInfo: { name: stepName(), version: "1.0.0" },
+        appCapabilities: {},
+      })
+        .then(() => sendNotification("ui/notifications/initialized", {}))
+        .catch((err) => {
+          const msgEl = document.querySelector("[data-msg]")
+          if (msgEl) msgEl.textContent = "握手失败: " + err.message
+        })
 
       // 初始占位
       setProgress({ progress: 0, total: 1, message: "就绪" })
