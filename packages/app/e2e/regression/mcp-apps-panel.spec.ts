@@ -29,6 +29,11 @@ const STEP_UI_HTML = `<!doctype html>
         var msg = (params && params.message) ? String(params.message) : ""
         var progress = (params && typeof params.progress === "number") ? params.progress : 0
         var total = (params && typeof params.total === "number") ? params.total : 0
+        // uiEvent 扩展字段：iframe 侧直接从 progress.uiEvent.<key> 读取逐步渲染数据。
+        if (params && params.uiEvent && params.uiEvent.event_type) {
+          out.textContent = "uiEvent:" + params.uiEvent.event_type
+          return
+        }
         if (msg) out.textContent = msg
         else out.textContent = progress + " / " + total
       }
@@ -37,7 +42,9 @@ const STEP_UI_HTML = `<!doctype html>
       function send(o) { window.parent.postMessage(o, "*") }
       function tryHandshake() {
         if (initiated) return
-        initId = Date.now() + Math.floor(Math.random() * 1e5)
+        // 复用同一 initId 直到握手成功（真实 step-ui 行为）：若每轮重新生成，
+        // host 回复的 id 可能匹配不上最新一轮，导致 initiated 永远为 false、握手永不完成。
+        if (initId === null) initId = Date.now() + Math.floor(Math.random() * 1e5)
         send({ jsonrpc: "2.0", id: initId, method: "ui/initialize",
                params: { protocolVersion: "2025-06-18",
                          appInfo: { name: "step", version: "1.0.0" },
@@ -253,6 +260,50 @@ test.describe("MCP Apps Panel", () => {
     await expect(frame.getByText("步骤一 3/5")).toBeVisible()
   })
 
+  test("forwards uiEvent extension data into the step-ui iframe", async ({ page }) => {
+    page.on("console", (msg) => {
+      if (msg.text().includes("[mcp-app]") || msg.text().includes("progress")) console.log("PAGE:", msg.text())
+    })
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_topology", "skill", "completed", { name: "pfd-topology" }),
+          toolPart("prt_topology_run", "ui-server_pfd_topology", "running", { pdf_path: "PFD.pdf" }, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "pfd_topology",
+                ui: { resourceUri: "ui://pfd-topology/review.html", visibility: ["model", "app"] },
+              },
+              mcpProgress: {
+                progress: 0,
+                total: 10,
+                message: "PDF 解析完成，共 2 页",
+                uiEvent: { event_type: "images_loaded", image_paths: ["page-0.png", "page-1.png"] },
+              },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://pfd-topology/review.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // MCP server 通过 notifications/progress 携带的 uiEvent 扩展字段必须透传到 iframe，
+    // step-ui 从 progress.uiEvent.event_type 读取并渲染（如 pfd_topology 的 images_loaded）。
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe).toBeVisible()
+    await page.waitForTimeout(3000)
+    const frame = iframe.contentFrame()
+    const body = await frame.locator("body").textContent().catch((e) => "ERR " + (e as Error).message)
+    console.log("DEBUG iframe body=", body)
+    await expect(frame.getByText("uiEvent:images_loaded")).toBeVisible()
+  })
+
   test("switches the panel tab to the newest tool when a new tool executes", async ({ page }) => {
     const timeline = await setupTimeline(page, {
       settings: { newLayoutDesigns: true },
@@ -302,6 +353,123 @@ test.describe("MCP Apps Panel", () => {
       "aria-selected",
       "true",
     )
+  })
+
+  test("reloads the app iframe when switching between tool tabs", async ({ page }) => {
+    // step1 / step3 各自返回不同标识文本的 UI HTML，用于断言切换后 iframe 确实重新加载了对应资源。
+    const stepOneHtml = STEP_UI_HTML.replace("<title>Step</title>", "<title>Step One</title>").replace(
+      '<div id="out">就绪</div>',
+      '<div id="out">Step One 就绪</div>',
+    )
+    const stepThreeHtml = STEP_UI_HTML.replace("<title>Step</title>", "<title>Step Three</title>").replace(
+      '<div id="out">就绪</div>',
+      '<div id="out">Step Three 就绪</div>',
+    )
+
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_13", "skill", "completed", { name: "step-13" }),
+          toolPart("prt_step1", "ui-server_step1", "completed", {}, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "step1",
+                ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] },
+              },
+            },
+          }),
+          toolPart("prt_step3", "ui-server_step3", "completed", {}, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "step3",
+                ui: { resourceUri: "ui://step3/progress.html", visibility: ["model", "app"] },
+              },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: {
+        servers: [{ name: "ui-server" }],
+        rpc: ({ method, params }: { method: string; params: { uri?: string } }) => {
+          if (method === "initialize") {
+            return {
+              protocolVersion: "2025-06-18",
+              capabilities: {},
+              serverInfo: { name: "ui-server", version: "1.0.0" },
+            }
+          }
+          if (method === "resources/read") {
+            const uri = params.uri
+            const text = uri === "ui://step1/progress.html" ? stepOneHtml : uri === "ui://step3/progress.html" ? stepThreeHtml : ""
+            return { contents: [{ uri, mimeType: "text/html", text }] }
+          }
+          if (method === "tools/list") return { tools: [] }
+          return { _meta: {} }
+        },
+      },
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // 初始选中最新执行的 step3 → iframe 渲染 Step Three。
+    await expect(panel.getByRole("tab", { name: "ui://step3/progress.html" })).toHaveAttribute("aria-selected", "true")
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe.contentFrame().getByText("Step Three")).toBeVisible()
+
+    // 切换到 step1 → iframe 必须重新加载出 Step One，而不是残留 Step Three 的 HTML。
+    await panel.getByRole("tab", { name: "ui://step1/progress.html" }).click()
+    await expect(iframe.contentFrame().getByText("Step One")).toBeVisible()
+    await expect(iframe.contentFrame().getByText("Step Three")).not.toBeVisible()
+  })
+
+  test("replays persisted final progress after switching back to a tool tab", async ({ page }) => {
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_13", "skill", "completed", { name: "step-13" }),
+          toolPart("prt_step1", "ui-server_step1", "completed", {}, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "step1",
+                ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] },
+              },
+              mcpProgress: { progress: 5, total: 5, message: "步骤一：解析输入 5/5" },
+            },
+          }),
+          toolPart("prt_step3", "ui-server_step3", "completed", {}, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "step3",
+                ui: { resourceUri: "ui://step3/progress.html", visibility: ["model", "app"] },
+              },
+              mcpProgress: { progress: 5, total: 5, message: "步骤三：结果汇总 5/5" },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://step1/progress.html", "ui://step3/progress.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // 初始选中最新执行的 step3：iframe 必须回放完成态持久化的最终进度。
+    await expect(panel.getByRole("tab", { name: "ui://step3/progress.html" })).toHaveAttribute("aria-selected", "true")
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe.contentFrame().getByText("步骤三：结果汇总 5/5")).toBeVisible()
+
+    // 切回 step1 tab：iframe 重载后必须回放 step1 的最终进度，而非回退到 "就绪"。
+    await panel.getByRole("tab", { name: "ui://step1/progress.html" }).click()
+    await expect(iframe.contentFrame().getByText("步骤一：解析输入 5/5")).toBeVisible()
   })
 
   test("shows empty state when no MCP apps", async ({ page }) => {
