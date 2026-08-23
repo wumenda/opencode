@@ -9,6 +9,7 @@ import { useMcpAppHost, type CallToolResult } from "../context/mcp-app-host"
 export type McpAppInfo = {
   server: string
   resourceUri: string
+  skill?: string
   fallbackData?: unknown
 }
 
@@ -38,6 +39,16 @@ export function mcpAppFromPart(part: ToolPart): McpAppInfo | undefined {
   if (typeof resourceUri !== "string" || !resourceUri) return
   // 结果不再经 fallbackData 注入，改由宿主注册表（McpAppHost）把运行中/最终事件推送给已挂载的 App。
   return { server, resourceUri, fallbackData: undefined }
+}
+
+/** Extracts the skill name from a `skill` tool part's input, if any. */
+export function skillNameFromPart(part: ToolPart): string | undefined {
+  if (part.tool !== "skill") return undefined
+  if (part.state.status !== "running" && part.state.status !== "completed") return undefined
+  const input = part.state.input
+  if (input && typeof input === "object" && typeof (input as Record<string, unknown>).name === "string")
+    return (input as Record<string, unknown>).name as string
+  return undefined
 }
 
 /** Extracts live MCP progress for a running tool part, if any. */
@@ -95,6 +106,19 @@ export function McpTool(props: {
     const result = mcp?.result
     if (result === undefined) return
     host.push(`${info.server}/${info.resourceUri}`, { type: "tool-result", result: result as CallToolResult })
+  })
+
+  // 工具 running 且已渲染 App 时，把流式 progress 推送给宿主注册表（由 McpAppView 转发进 iframe）。
+  createEffect(() => {
+    const info = app()
+    const value = progress()
+    if (!info || !value) return
+    host.push(`${info.server}/${info.resourceUri}`, {
+      type: "tool-progress",
+      progress: value.progress,
+      total: value.total,
+      message: value.message,
+    })
   })
 
   // 工具 error（取消）且已渲染 App 时，把取消原因推送给已挂载的 App，使其保持挂载并展示取消态。

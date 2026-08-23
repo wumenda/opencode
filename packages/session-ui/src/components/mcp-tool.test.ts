@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import type { ToolPart } from "@opencode-ai/sdk/v2"
-import { mcpAppFromPart, mcpProgressFromPart } from "./mcp-tool"
+import { mcpAppFromPart, mcpProgressFromPart, skillNameFromPart } from "./mcp-tool"
 
 function part(input: {
   status?: "pending" | "running" | "completed" | "error"
+  tool?: string
+  inputValue?: Record<string, unknown>
   stateMetadata?: Record<string, unknown>
 }): ToolPart {
   const status = input.status ?? "completed"
@@ -13,10 +15,10 @@ function part(input: {
     messageID: "msg_1",
     type: "tool",
     callID: "call_1",
-    tool: "weather_show_dashboard",
+    tool: input.tool ?? "weather_show_dashboard",
     state: {
       status,
-      input: {},
+      input: input.inputValue ?? {},
       output: "done",
       title: "Show dashboard",
       metadata: input.stateMetadata ?? {},
@@ -96,5 +98,27 @@ describe("mcpProgressFromPart", () => {
   test("returns undefined when progress is not a number", () => {
     const progress = mcpProgressFromPart(part({ status: "running", stateMetadata: { mcpProgress: { progress: "5" } } }))
     expect(progress).toBeUndefined()
+  })
+})
+
+describe("skillNameFromPart", () => {
+  test("returns the skill name for a completed skill tool", () => {
+    expect(skillNameFromPart(part({ tool: "skill", inputValue: { name: "refinery" } }))).toBe("refinery")
+  })
+
+  test("returns the skill name for a running skill tool", () => {
+    expect(skillNameFromPart(part({ tool: "skill", status: "running", inputValue: { name: "refinery" } }))).toBe("refinery")
+  })
+
+  test("returns undefined for non-skill tools", () => {
+    expect(skillNameFromPart(part({}))).toBeUndefined()
+  })
+
+  test("returns undefined when the skill input has no name", () => {
+    expect(skillNameFromPart(part({ tool: "skill", inputValue: {} }))).toBeUndefined()
+  })
+
+  test("returns undefined while the skill tool is still pending", () => {
+    expect(skillNameFromPart(part({ tool: "skill", status: "pending", inputValue: { name: "x" } }))).toBeUndefined()
   })
 })
