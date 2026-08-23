@@ -17,7 +17,7 @@ export type McpAppEvent =
   | { type: "tool-input-partial"; arguments: Record<string, unknown> }
   | { type: "tool-result"; result: CallToolResult }
   | { type: "tool-cancelled"; reason: string }
-  | { type: "tool-progress"; progress: number; total?: number; message?: string }
+  | { type: "tool-progress"; progress: number; total?: number; message?: string; uiEvent?: unknown }
 
 export type McpAppSink = (event: McpAppEvent) => void
 

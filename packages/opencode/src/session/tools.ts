@@ -392,8 +392,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     // app-only and must not join the agent's tool list.
     const ui = McpCatalog.toolUi(entry.def)
     if (ui && !ui.visibility.includes("model")) continue
-    const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout, (progress, toolCallId) =>
-      run.fork(
+    // 记住最近一次进度：完成时随 metadata 持久化到 part，供前端刷新/切会话后回放最终进度。
+    let lastProgress: McpCatalog.McpProgress | undefined
+    const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout, (progress, toolCallId) => {
+      lastProgress = progress
+      return run.fork(
         input.processor.updateToolCall(toolCallId, (match) => {
           if (match.state.status === "completed" || match.state.status === "error") return match
           const state = match.state.status === "running" ? match.state : undefined
@@ -422,8 +425,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
             },
           }
         }),
-      ),
-    )
+      )
+    })
     const execute = item.execute
     if (!execute) continue
 
@@ -512,6 +515,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                   },
                 }
               : {}),
+            // 保留最近一次进度：前端刷新/切会话后据此回放最终进度（如 5/5）。
+            ...(lastProgress ? { mcpProgress: lastProgress } : {}),
             truncated: truncated.truncated,
             ...(truncated.truncated && { outputPath: truncated.outputPath }),
           }

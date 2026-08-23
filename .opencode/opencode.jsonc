@@ -14,10 +14,17 @@
   },
   "mcp": {
     "ui-server": { "type": "local", "command": ["bun", "run", "packages/opencode/test/mcp/fixtures/ui-server.ts"] },
-    "remote-server": { "type": "remote", "url": "http://localhost:8000/mcp" }
+    "remote-server": {
+      "type": "remote",
+      "url": "http://localhost:8000/mcp",
+      "timeout": 7200000,
+    }
   },
   "tools": {
     "github-triage": false,
     "github-pr-search": false,
+  },
+  "experimental": {
+    "mcp_timeout": 7200000,
   },
 }

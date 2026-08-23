@@ -1,4 +1,14 @@
 # 停止 opencode 前端、后端和 pdf2json MCP 服务
+# 递归杀掉进程树（bun 会 spawn 子进程，端口可能被子进程持有）
+
+function Stop-ProcessTree($processId) {
+    $children = Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $processId }
+    foreach ($child in $children) {
+        Stop-ProcessTree $child.ProcessId
+    }
+    Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+}
+
 $stopped = @()
 
 foreach ($port in 4096, 4444, 8000) {
@@ -7,7 +17,7 @@ foreach ($port in 4096, 4444, 8000) {
         $conns | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {
             $proc = Get-Process -Id $_ -ErrorAction SilentlyContinue
             if ($proc) {
-                Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+                Stop-ProcessTree $_
                 $stopped += "端口 $port - $($proc.ProcessName) (PID: $_)"
             }
         }
@@ -19,4 +29,29 @@ if ($stopped.Count -gt 0) {
     $stopped | ForEach-Object { Write-Host "  $_" }
 } else {
     Write-Host "没有发现运行中的服务"
+}
+
+# 等待端口释放（最多 10 秒）
+$ports = 4096, 4444, 8000
+for ($i = 0; $i -lt 20; $i++) {
+    $busy = $false
+    foreach ($port in $ports) {
+        if (Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue) {
+            $busy = $true
+            break
+        }
+    }
+    if (-not $busy) { break }
+    Start-Sleep -Milliseconds 500
+}
+
+if ($busy) {
+    Write-Host "`n警告: 部分端口仍被占用:"
+    foreach ($port in $ports) {
+        if (Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue) {
+            Write-Host "  端口 $port 仍被占用"
+        }
+    }
+} else {
+    Write-Host "`n所有端口已释放"
 }
