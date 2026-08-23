@@ -224,6 +224,31 @@ test.describe("session timeline projection", () => {
     await expect(page.getByText("@src/a.ts", { exact: true })).toBeVisible()
     await expect(page.getByText("@explore", { exact: true })).toBeVisible()
   })
+
+  test("projects a skill and its MCP UI tools together", async ({ page }) => {
+    const parts = [
+      toolPart("prt_skill_group_a", "skill", "completed", { name: "refinery" }),
+      toolPart(
+        "prt_app_a",
+        "custom_mcp_tool",
+        "completed",
+        { target: "a" },
+        { metadata: { mcp: { server: "srv", ui: { resourceUri: "ui://a" } } } },
+      ),
+      toolPart(
+        "prt_app_b",
+        "custom_mcp_tool",
+        "completed",
+        { target: "b" },
+        { metadata: { mcp: { server: "srv", ui: { resourceUri: "ui://b" } } } },
+      ),
+    ]
+    await setupTimeline(page, { messages: [userMessage(), assistantMessage(parts)] })
+
+    for (const id of ["prt_skill_group_a", "prt_app_a", "prt_app_b"]) {
+      await expect(page.locator(`[data-timeline-part-id="${id}"]`).first(), id).toBeVisible()
+    }
+  })
 })
 
 function editPart(id: string) {
