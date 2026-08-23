@@ -1295,18 +1295,19 @@ export default function Page() {
 
   const mcpAppsState = createMcpAppsPanelState()
   const mcpApps = useMcpApps(() => params.id)
+  const mcpAppCount = createMemo(() => mcpApps().reduce((sum, group) => sum + group.apps.length, 0))
   const reviewV2State = createReviewPanelV2State()
 
   const mcpAppsPanel = () => (
     <div class="flex flex-col h-full overflow-hidden bg-v2-background-bg-base contain-strict">
-      <McpAppsPanel apps={mcpApps} state={mcpAppsState} />
+      <McpAppsPanel groups={mcpApps} state={mcpAppsState} />
     </div>
   )
 
   // 当首次出现 MCP App UI 时，自动展开侧面板
   createEffect(
     on(
-      () => mcpApps().length,
+      () => mcpAppCount(),
       (count, prev) => {
         if (prev === undefined && count > 0) {
           if (!view().reviewPanel.opened()) view().reviewPanel.open()
@@ -2289,9 +2290,9 @@ export default function Page() {
                       diffs={reviewDiffs}
                       diffsReady={reviewReady}
                       empty={reviewEmptyText}
-                      hasReview={() => mcpApps().length > 0}
-                      reviewHasFocusableContent={() => mcpApps().length > 0}
-                      reviewCount={() => mcpApps().length}
+                      hasReview={() => mcpAppCount() > 0}
+                      reviewHasFocusableContent={() => mcpAppCount() > 0}
+                      reviewCount={() => mcpAppCount()}
                       reviewPanel={mcpAppsPanel}
                       fileBrowserState={reviewV2State}
                       activeDiff={activeReviewFile()}
