@@ -109,6 +109,8 @@ pdf2json 侧 `_get_ui_html`（`mcps/pdf2json/mcp_server/duck_implement/_common.p
 4. `buildSandboxedHtml`：注入 CSP、`URL.createObjectURL` 生成 blob URL，sandbox 令牌 `allow-scripts`（+ 可选 `allow-clipboard-write`），`allow` 属性映射权限策略。
 5. iframe `onLoad` → 新建 `AppBridge` + `PostMessageTransport` → `connect`，握手完成后冲刷缓冲事件。
 
+> **组件复用与重新加载**：`McpAppView` 由 `createEffect` 驱动 `start()`——首次挂载及 `server`/`resourceUri` prop 变化（如侧栏面板在多个 tool tab 间切换复用同一组件实例）时都会重新加载 iframe。若只在 `onMount` 加载一次，切换 tab 会出现"iframe HTML 残留上一个 App、进度内容却按新 key 正确路由"的错位。`start()` 会重置 `appInitialized` 并重建 AppBridge/blob URL。
+
 ### 4.3 沙箱策略
 
 - CSP：`default-src 'none'`；`script-src 'unsafe-inline' 'self' data:` + 声明的 scriptDomains；`connect-src` 限声明域名；`frame-ancestors 'self'`。
@@ -217,6 +219,25 @@ iframe 侧走 **AppBridge**（`@modelcontextprotocol/ext-apps/app-bridge`），�
 6. **注册表广播**：同一 appKey 的所有 `McpAppView` 收到事件 → 各自 `forward` 进 iframe。
 7. **iframe（step-ui）**：监听 `notifications/progress` → 更新进度条/百分比/计数/消息。
 
+**uiEvent 扩展字段**：MCP server 可在 `notifications/progress` 的 params 中携带非标准
+`uiEvent` 字段（如 pdf2json 的 `content.send_progress_with_data(..., ui_event={...})`），
+前端 step-ui 从 `progress.uiEvent.<key>` 读取逐步渲染所需数据。host 用宽松 schema 重注册
+`notifications/progress`（`McpCatalog.installUiEventNotificationHandlers`）避免 SDK 剥离
+扩展字段，uiEvent 随 `metadata.mcpProgress` 持久化并经 `tool-progress` 事件透传进 iframe；
+未注册 method 的非标准通知若携带 `progressToken + uiEvent`，由 `fallbackNotificationHandler`
+兜底走同一进度管道。
+
+### 7.1 完成态最终进度持久化与回放（刷新/切会话后恢复）
+
+运行期进度只存在于前端内存与 SSE 事件流中，整页刷新/切换会话后即丢失。为此在**完成时持久化最终进度**：
+
+- **后端**（`packages/opencode/src/session/tools.ts`）：进度回调闭包记忆 `lastProgress`；工具完成写入 part 的 `state.metadata.mcpProgress = lastProgress`（随会话数据持久化到后端存储）。运行期 `mcp`（server/tool/ui）元数据也提前写入，保证刷新后前端仍能解析出 `ui://` 资源并挂载 iframe。
+- **前端**（`packages/session-ui/src/components/mcp-tool.tsx`）：`McpTool` 的 `completedProgressFromPart` 从 completed part 提取最终进度，在 completed 时向注册表 `push` 一次 `tool-progress`（最终值）。刷新后新挂载的 `McpAppView` 注册时收到该重放并转发进 iframe，恢复 "100% / 5 / 5 / 步骤一：解析输入 5/5"。
+
+### 7.2 McpAppView 跨 tab 重载时的进度恢复
+
+侧栏面板在 skill 下切换 tool tab（如 step1 ↔ step3）复用同一个 `McpAppView` 组件实例。`McpAppView` 的注册与 iframe 重载逻辑合并为一个 effect：`resourceUri` 变化时**先**同步重载 iframe（清空旧 bridge / `appInitialized`），**再**重注册 sink。这样 `host.register` 重放的 `lastProgress` 会进入新 iframe 的 pending 缓冲，待握手完成后冲刷，避免重放事件被 `forward` 到旧 bridge 而丢失（表现为切 tab 后进度回退 "0% / 就绪"）。
+
 ---
 
 ## 8. Skill → Tool 两级 Tab
@@ -250,12 +271,12 @@ iframe 侧走 **AppBridge**（`@modelcontextprotocol/ext-apps/app-bridge`），�
 | 模型上下文更新 | ✅ | `onupdatemodelcontext` → `modelContextHost` |
 | 沙箱隔离 | ✅ | CSP + `sandbox="allow-scripts"`，无 `allow-same-origin` |
 | 多挂载面事件同步 | ✅ | 注册表多 sink 广播 + lastProgress 重放 |
-| iframe 重挂载进度恢复 | ✅ | 注册表重放最近进度；页面整体刷新后不保留（注册表为进程级） |
+| iframe 重挂载进度恢复 | ✅ | 注册表重放最近进度；整页刷新/切会话由完成态持久化的 `metadata.mcpProgress` 回放 |
 
 已知限制 / 注意点：
 
 - **iframe 沙箱**：无 `allow-same-origin`，父页面不能直接 `contentDocument` 读取 iframe 内容（调试需借助浏览器 frame 级工具）。
-- **页面刷新即重置**：`McpAppHost` 是进程级内存对象，整页刷新后历史工具卡内 iframe 回到初始 "就绪" 态（运行期进度仍会实时展示）。
+- **完成态持久化仅对修复后执行的工具生效**：历史会话中（修复前）完成的 tool part 没有 `metadata.mcpProgress`，刷新后其 iframe 无法回放最终进度（回退初始 "就绪" 态）。重新执行工具后即恢复。
 - **进度事件合并**：正常情况下 5 步完整转发；主线程繁忙时同一 flush 窗口内的同 part 进度可能合并，UI 表现为跳变。
 - **握手时序**：iframe 侧 AppBridge 握手晚于工具运行结束时，进度事件先入 pending，初始化后一次性冲刷（显示最终进度而非逐级）。
 
