@@ -3,6 +3,7 @@ import type { ToolPart } from "@opencode-ai/sdk/v2"
 import { mcpAppFromPart, mcpProgressFromPart, skillNameFromPart } from "./mcp-tool"
 
 function part(input: {
+  id?: string
   status?: "pending" | "running" | "completed" | "error"
   tool?: string
   inputValue?: Record<string, unknown>
@@ -10,7 +11,7 @@ function part(input: {
 }): ToolPart {
   const status = input.status ?? "completed"
   return {
-    id: "part_1",
+    id: input.id ?? "part_1",
     sessionID: "ses_1",
     messageID: "msg_1",
     type: "tool",
@@ -40,6 +41,8 @@ describe("mcpAppFromPart", () => {
     expect(info).toEqual({
       server: "weather",
       resourceUri: "ui://dashboard",
+      instanceID: "part_1",
+      toolName: "show_dashboard",
       // 结果改由宿主注册表推送，fallbackData 恒为 undefined，避免与注册表推送重复。
       fallbackData: undefined,
     })
@@ -50,13 +53,15 @@ describe("mcpAppFromPart", () => {
     expect(info).toEqual({
       server: "weather",
       resourceUri: "ui://dashboard",
+      instanceID: "part_1",
+      toolName: "show_dashboard",
       fallbackData: undefined,
     })
   })
 
   test("returns app info for a cancelled (error) tool so it stays mounted", () => {
     const info = mcpAppFromPart(part({ status: "error", stateMetadata: { mcp: { server: "ui", ui: { resourceUri: "ui://x" } } } }))
-    expect(info).toEqual({ server: "ui", resourceUri: "ui://x", fallbackData: undefined })
+    expect(info).toEqual({ server: "ui", resourceUri: "ui://x", instanceID: "part_1", toolName: undefined, fallbackData: undefined })
   })
 
   test("returns undefined without mcp metadata", () => {
@@ -73,6 +78,22 @@ describe("mcpAppFromPart", () => {
   test("returns undefined when server is not a string", () => {
     const info = mcpAppFromPart(part({ stateMetadata: { mcp: { server: 42, ui: { resourceUri: "ui://x" } } } }))
     expect(info).toBeUndefined()
+  })
+
+  test("uses the part id as the per-call instance id", () => {
+    const info = mcpAppFromPart(part({ id: "prt_call_2", stateMetadata: { mcp: mcpMeta } }))
+    expect(info).toEqual({
+      server: "weather",
+      resourceUri: "ui://dashboard",
+      instanceID: "prt_call_2",
+      toolName: "show_dashboard",
+      fallbackData: undefined,
+    })
+  })
+
+  test("omits toolName when the mcp metadata has no tool", () => {
+    const info = mcpAppFromPart(part({ stateMetadata: { mcp: { server: "ui", ui: { resourceUri: "ui://x" } } } }))
+    expect(info).toEqual({ server: "ui", resourceUri: "ui://x", instanceID: "part_1", toolName: undefined, fallbackData: undefined })
   })
 })
 

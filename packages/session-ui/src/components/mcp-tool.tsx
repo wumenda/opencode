@@ -9,6 +9,10 @@ import { useMcpAppHost, type CallToolResult } from "../context/mcp-app-host"
 export type McpAppInfo = {
   server: string
   resourceUri: string
+  /** 调用实例标识（part.id）：同一 tool 多次调用各自独立，事件按它隔离。 */
+  instanceID: string
+  /** 工具名（metadata.mcp.tool），供面板 tab 显示调用链。 */
+  toolName?: string
   skill?: string
   fallbackData?: unknown
 }
@@ -17,6 +21,8 @@ export type McpProgressInfo = {
   progress: number
   total?: number
   message?: string
+  /** MCP server 通过 notifications/progress 的扩展字段携带的结构化数据（pdf2json uiEvent）。 */
+  uiEvent?: unknown
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -37,8 +43,9 @@ export function mcpAppFromPart(part: ToolPart): McpAppInfo | undefined {
   const resourceUri = record(mcp.ui)?.resourceUri
   if (typeof server !== "string" || !server) return
   if (typeof resourceUri !== "string" || !resourceUri) return
+  const toolName = typeof mcp.tool === "string" ? mcp.tool : undefined
   // 结果不再经 fallbackData 注入，改由宿主注册表（McpAppHost）把运行中/最终事件推送给已挂载的 App。
-  return { server, resourceUri, fallbackData: undefined }
+  return { server, resourceUri, instanceID: part.id, toolName, fallbackData: undefined }
 }
 
 /** Extracts the skill name from a `skill` tool part's input, if any. */
@@ -60,10 +67,30 @@ export function mcpProgressFromPart(part: ToolPart): McpProgressInfo | undefined
   if (typeof progress !== "number") return
   const total = value.total
   const message = value.message
+  const uiEvent = value.uiEvent
   return {
     progress,
     total: typeof total === "number" ? total : undefined,
     message: typeof message === "string" ? message : undefined,
+    uiEvent,
+  }
+}
+
+/** Extracts the persisted final progress from a completed tool part, for iframe replay after refresh. */
+export function completedProgressFromPart(part: ToolPart): McpProgressInfo | undefined {
+  if (part.state.status !== "completed") return
+  const value = record(toolMetadata(part)?.mcpProgress)
+  if (!value) return
+  const progress = value.progress
+  if (typeof progress !== "number") return
+  const total = value.total
+  const message = value.message
+  const uiEvent = value.uiEvent
+  return {
+    progress,
+    total: typeof total === "number" ? total : undefined,
+    message: typeof message === "string" ? message : undefined,
+    uiEvent,
   }
 }
 
@@ -115,11 +142,30 @@ export function McpTool(props: {
     const info = app()
     const value = progress()
     if (!info || !value) return
+    console.log("[mcp-tool] push tool-progress", { key: appKey(info), progress: value.progress, hasUiEvent: value.uiEvent !== undefined })
     host.push(appKey(info), {
       type: "tool-progress",
       progress: value.progress,
       total: value.total,
       message: value.message,
+      uiEvent: value.uiEvent,
+    })
+  })
+
+  // 工具 completed 且 metadata 保留最终进度时，推送一次最终 tool-progress：
+  // 供 iframe 在页面刷新/切会话/重挂载后回放最终进度（如 5/5），避免停在 "0% / 就绪"。
+  createEffect(() => {
+    const info = app()
+    if (!info) return
+    if (props.part.state.status !== "completed") return
+    const value = completedProgressFromPart(props.part)
+    if (!value) return
+    host.push(appKey(info), {
+      type: "tool-progress",
+      progress: value.progress,
+      total: value.total,
+      message: value.message,
+      uiEvent: value.uiEvent,
     })
   })
 
