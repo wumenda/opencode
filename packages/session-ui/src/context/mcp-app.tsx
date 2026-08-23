@@ -5,6 +5,8 @@ export type McpAppRendererInput = {
   server: string
   resourceUri: string
   fallbackData?: unknown
+  /** 归属会话：McpAppHost 事件按 sessionID 隔离，避免跨 session 串扰。 */
+  sessionID?: string
 }
 
 /** Renders an MCP App (SEP-1865) inline. Provided by hosts that support ui:// app resources. */

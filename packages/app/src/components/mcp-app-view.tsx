@@ -27,6 +27,8 @@ export type McpAppViewProps = {
   server: string
   /** ui:// resource URI of the app HTML document. */
   resourceUri: string
+  /** 归属会话：McpAppHost 事件按 sessionID 隔离（与 McpTool 的 push key 保持一致）。 */
+  sessionID?: string
   /** Completed tool result (contract 1 metadata.mcp.result) replayed into the app after init. */
   fallbackData?: CallToolResult
   onError?: (message: string) => void
@@ -115,11 +117,22 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     while (pending.length) forward(pending.shift()!)
   }
 
-  // 按 server/resourceUri 在宿主注册表注册/注销本 App 的 sink，接收运行中/完成的工具事件。
-  const appKey = () => `${props.server}/${props.resourceUri}` as AppKey
+  // 按 sessionID:server/resourceUri 在宿主注册表注册/注销本 App 的 sink，接收运行中/完成的工具事件。
+  // sessionID 前缀用于跨 session 隔离：不同会话的同一 ui:// App 使用不同 key，互不串扰。
+  const appKey = () => `${props.sessionID ? `${props.sessionID}:` : ""}${props.server}/${props.resourceUri}` as AppKey
+  // appKey（sessionID 或 server/resourceUri）变化时重注册：切换 session 后旧 key 注销、pending 清空，
+  // 确保只接收当前会话的事件。
+  let registeredKey: string | undefined
+  createEffect(() => {
+    const key = appKey()
+    if (key === registeredKey) return
+    unregister?.()
+    pending.length = 0
+    unregister = host.register(key, handleEvent)
+    registeredKey = key
+  })
   onMount(() => {
     void start()
-    unregister = host.register(appKey(), handleEvent)
     // 宿主容器尺寸变化时实时推送 hostContext（避免首帧容器尚未布局导致尺寸为 0）。
     if (typeof ResizeObserver !== "undefined" && containerRef) {
       resizeObserver = new ResizeObserver(onResize)

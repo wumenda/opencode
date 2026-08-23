@@ -1140,7 +1140,14 @@ export function createServerSession(
           return
         }
         const result = Binary.search(parts, part.id, (item) => item.id)
-        if (result.found) setData("part", part.messageID, result.index, reconcile(part))
+        if (result.found)
+          setData(
+            "part",
+            part.messageID,
+            produce((draft) => {
+              draft[result.index] = part
+            }),
+          )
         if (!result.found)
           setData("part", part.messageID, (value = []) => {
             const next = value.slice()

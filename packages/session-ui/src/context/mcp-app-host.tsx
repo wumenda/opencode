@@ -17,6 +17,7 @@ export type McpAppEvent =
   | { type: "tool-input-partial"; arguments: Record<string, unknown> }
   | { type: "tool-result"; result: CallToolResult }
   | { type: "tool-cancelled"; reason: string }
+  | { type: "tool-progress"; progress: number; total?: number; message?: string }
 
 export type McpAppSink = (event: McpAppEvent) => void
 
@@ -27,24 +28,39 @@ export type McpAppHost = {
 
 /** 路由 + 预注册缓冲：App 尚未挂载时 push 的事件暂存，注册时冲刷。 */
 export function createMcpAppHostRegistry(): McpAppHost {
-  const sinks = new Map<AppKey, McpAppSink>()
+  const sinks = new Map<AppKey, Set<McpAppSink>>()
   const pending = new Map<AppKey, McpAppEvent[]>()
+  // 记住每个 App 最近一次的 tool-progress：iframe 因 timeline 重渲染/虚拟化被重挂载时，
+  // 重放该进度让 step-ui 恢复最终进度，而不是重置回 "0% / 就绪"。
+  const lastProgress = new Map<AppKey, McpAppEvent>()
   return {
     register(key, sink) {
-      sinks.set(key, sink)
+      let set = sinks.get(key)
+      if (!set) {
+        set = new Set()
+        sinks.set(key, set)
+      }
+      set.add(sink)
       const buffered = pending.get(key)
       if (buffered) {
         pending.delete(key)
         buffered.forEach(sink)
       }
+      const progress = lastProgress.get(key)
+      if (progress) sink(progress)
       return () => {
-        if (sinks.get(key) === sink) sinks.delete(key)
+        const current = sinks.get(key)
+        if (!current) return
+        current.delete(sink)
+        if (current.size === 0) sinks.delete(key)
       }
     },
     push(key, event) {
-      const sink = sinks.get(key)
-      if (sink) {
-        sink(event)
+      if (event.type === "tool-progress") lastProgress.set(key, event)
+      const set = sinks.get(key)
+      if (set && set.size > 0) {
+        // 广播到同一 App 的所有挂载面（对话流工具卡 + 侧栏 skill tab 面板共用同一 key）。
+        set.forEach((sink) => sink(event))
         return
       }
       const buf = pending.get(key) ?? []

@@ -1295,12 +1295,17 @@ export default function Page() {
 
   const mcpAppsState = createMcpAppsPanelState()
   const mcpApps = useMcpApps(() => params.id)
-  const mcpAppCount = createMemo(() => mcpApps().reduce((sum, group) => sum + group.apps.length, 0))
+  const mcpAppCount = createMemo(() => mcpApps().groups.reduce((sum, group) => sum + group.apps.length, 0))
   const reviewV2State = createReviewPanelV2State()
 
   const mcpAppsPanel = () => (
     <div class="flex flex-col h-full overflow-hidden bg-v2-background-bg-base contain-strict">
-      <McpAppsPanel groups={mcpApps} state={mcpAppsState} />
+      <McpAppsPanel
+        groups={() => mcpApps().groups}
+        latestExecuted={() => mcpApps().latestExecuted}
+        sessionID={params.id}
+        state={mcpAppsState}
+      />
     </div>
   )
 

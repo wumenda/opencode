@@ -2,6 +2,7 @@ import { For, Show, createEffect, createMemo, type JSX } from "solid-js"
 import { Icon } from "@opencode-ai/ui/icon"
 import { useLanguage } from "@/context/language"
 import { McpAppView } from "@/components/mcp-app-view"
+import type { McpAppInfo } from "@opencode-ai/session-ui/mcp-tool"
 import {
   toolTabId,
   type McpAppsPanelState,
@@ -10,6 +11,10 @@ import {
 
 export type McpAppsPanelProps = {
   groups: () => SkillAppGroup[]
+  /** 最近一次执行的 MCP App（含 partID）：partID 变化即新 tool 执行，自动切换 tab 焦点。 */
+  latestExecuted: () => { app: McpAppInfo; partID: string } | undefined
+  /** 当前会话 ID：传递给 McpAppView 用于 McpAppHost 事件按 session 隔离。 */
+  sessionID?: string
   state: McpAppsPanelState
 }
 
@@ -33,6 +38,18 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
       state.setActiveSkill(first.name)
       state.setActiveTool(first.apps[0] ? toolTabId(first.apps[0]) : undefined)
     }
+  })
+
+  // 新 tool 执行时（latestExecuted.partID 变化），把右侧展示区 tab 焦点切换到该 tool 的 UI。
+  // 同一 part 的进度刷新不会重复切换；同一 resourceUri 的重复执行（新 part）也会切换。
+  let lastExecutedPartID: string | undefined
+  createEffect(() => {
+    const latest = props.latestExecuted()
+    if (!latest) return
+    if (latest.partID === lastExecutedPartID) return
+    lastExecutedPartID = latest.partID
+    state.setActiveSkill(latest.app.skill)
+    state.setActiveTool(toolTabId(latest.app))
   })
 
   const activeGroup = createMemo(
@@ -130,7 +147,9 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
               </div>
             }
           >
-            {(app) => <McpAppView server={app().server} resourceUri={app().resourceUri} fillHeight />}
+            {(app) => (
+              <McpAppView server={app().server} resourceUri={app().resourceUri} sessionID={props.sessionID} fillHeight />
+            )}
           </Show>
         </div>
       </Show>

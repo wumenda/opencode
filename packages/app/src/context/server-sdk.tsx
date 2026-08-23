@@ -60,7 +60,16 @@ const coalescedKey = (event: QueuedServerEvent) => {
   if (event.payload.type === "lsp.updated") return `lsp.updated:${event.directory}`
   if (event.payload.type === "message.part.updated") {
     const part = event.payload.properties.part
-    return `message.part.updated:${event.directory}:${part.messageID}:${part.id}`
+    // 进度事件携带 progress 步进：把 progress 并入键，避免同一 flush 内中间步骤被合并丢弃，
+    // 保证 tool 进度条能逐级推进（如 1/5 → 2/5 → … → 5/5）。
+    const state = "state" in part ? (part.state as { metadata?: unknown }) : undefined
+    const meta = state?.metadata
+    const progress =
+      meta && typeof meta === "object"
+        ? (meta as { mcpProgress?: { progress?: unknown } }).mcpProgress?.progress
+        : undefined
+    const progressKey = typeof progress === "number" ? `:progress:${progress}` : ""
+    return `message.part.updated:${event.directory}:${part.messageID}:${part.id}${progressKey}`
   }
   return undefined
 }

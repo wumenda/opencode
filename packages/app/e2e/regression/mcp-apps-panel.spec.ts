@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import {
   assistantMessage,
+  partUpdated,
   setupTimeline,
   toolPart,
   userMessage,
@@ -250,6 +251,57 @@ test.describe("MCP Apps Panel", () => {
     await expect(iframe).toBeVisible()
     const frame = iframe.contentFrame()
     await expect(frame.getByText("步骤一 3/5")).toBeVisible()
+  })
+
+  test("switches the panel tab to the newest tool when a new tool executes", async ({ page }) => {
+    const timeline = await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_12", "skill", "completed", { name: "step-12" }),
+          toolPart("prt_step1", "ui-server_step1", "completed", {}, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "step1",
+                ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] },
+              },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://step1/progress.html", "ui://step2/progress.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // 初始只有 step1：面板选中 step1 的 tab。
+    await expect(panel.getByRole("tab", { name: "ui://step1/progress.html" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+
+    // 新 tool（step2）执行完成 → 面板自动把 tab 焦点切换到 step2 的 UI。
+    await timeline.send(
+      partUpdated(
+        toolPart("prt_step2", "ui-server_step2", "completed", {}, {
+          metadata: {
+            mcp: {
+              server: "ui-server",
+              tool: "step2",
+              ui: { resourceUri: "ui://step2/progress.html", visibility: ["model", "app"] },
+            },
+          },
+        }),
+      ),
+    )
+
+    await expect(panel.getByRole("tab", { name: "ui://step2/progress.html" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
   })
 
   test("shows empty state when no MCP apps", async ({ page }) => {

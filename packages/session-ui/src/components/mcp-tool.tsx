@@ -80,6 +80,8 @@ export function McpTool(props: {
   const host = useMcpAppHost()
   const app = createMemo(() => mcpAppFromPart(props.part))
   const progress = createMemo(() => mcpProgressFromPart(props.part))
+  // McpAppHost 事件按 sessionID 隔离：key 带上 part 归属会话，避免跨 session 串扰。
+  const appKey = (info: McpAppInfo) => `${props.part.sessionID}:${info.server}/${info.resourceUri}`
 
   // 当前 running 状态的输入，作为流式部分输入推送给已挂载的 App。
   const runningInput = createMemo<Record<string, unknown> | undefined>(() => {
@@ -94,7 +96,7 @@ export function McpTool(props: {
     const info = app()
     const input = runningInput()
     if (!info || !input) return
-    host.push(`${info.server}/${info.resourceUri}`, { type: "tool-input-partial", arguments: input })
+    host.push(appKey(info), { type: "tool-input-partial", arguments: input })
   })
 
   // 工具 completed 且携带 metadata.mcp.result 时，把最终结果推送给已挂载的 App。
@@ -105,7 +107,7 @@ export function McpTool(props: {
     const mcp = record(toolMetadata(props.part)?.mcp)
     const result = mcp?.result
     if (result === undefined) return
-    host.push(`${info.server}/${info.resourceUri}`, { type: "tool-result", result: result as CallToolResult })
+    host.push(appKey(info), { type: "tool-result", result: result as CallToolResult })
   })
 
   // 工具 running 且已渲染 App 时，把流式 progress 推送给宿主注册表（由 McpAppView 转发进 iframe）。
@@ -113,7 +115,7 @@ export function McpTool(props: {
     const info = app()
     const value = progress()
     if (!info || !value) return
-    host.push(`${info.server}/${info.resourceUri}`, {
+    host.push(appKey(info), {
       type: "tool-progress",
       progress: value.progress,
       total: value.total,
@@ -127,7 +129,7 @@ export function McpTool(props: {
     if (!info) return
     if (props.part.state.status !== "error") return
     const err = (props.part.state as { error?: string }).error
-    host.push(`${info.server}/${info.resourceUri}`, { type: "tool-cancelled", reason: err ?? "cancelled" })
+    host.push(appKey(info), { type: "tool-cancelled", reason: err ?? "cancelled" })
   })
 
   const percent = createMemo(() => {
@@ -149,7 +151,9 @@ export function McpTool(props: {
         defer={props.deferContent}
       >
         {/* Non-keyed on purpose: part updates must not remount the sandboxed app iframe. */}
-        <Show when={app()}>{(info) => renderApp?.(info())}</Show>
+        <Show when={app()}>
+          {(info) => renderApp?.({ ...info(), sessionID: props.part.sessionID })}
+        </Show>
       </BasicTool>
       <Show when={progress()}>
         {(value) => (

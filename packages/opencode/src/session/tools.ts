@@ -403,6 +403,17 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               title: state?.title,
               metadata: {
                 ...state?.metadata,
+                // MCP Apps (SEP-1865): 运行期就带上 server/tool/ui，让前端能提前挂载
+                // iframe App 并实时转发 tool-progress（result 仍只在完成时写入）。
+                ...(ui
+                  ? {
+                      mcp: {
+                        server: entry.server,
+                        tool: entry.def.name,
+                        ui,
+                      },
+                    }
+                  : {}),
                 mcpProgress: { ...progress, time: Date.now() },
               },
               status: "running" as const,

@@ -36,4 +36,44 @@ describe("createMcpAppHostRegistry", () => {
     expect(received).toEqual([{ type: "tool-cancelled", reason: "canceled" }])
     un()
   })
+
+  test("routes tool-progress to the registered sink", () => {
+    const reg = createMcpAppHostRegistry()
+    const received: McpAppEvent[] = []
+    const un = reg.register("a/ui://x", (e) => received.push(e))
+    reg.push("a/ui://x", { type: "tool-progress", progress: 3, total: 5, message: "step 3/5" })
+    expect(received).toEqual([{ type: "tool-progress", progress: 3, total: 5, message: "step 3/5" }])
+    un()
+  })
+
+  test("replays the last tool-progress to a re-registered (remounted) app", () => {
+    const reg = createMcpAppHostRegistry()
+    const first: McpAppEvent[] = []
+    const firstUn = reg.register("a/ui://x", (e) => first.push(e))
+    reg.push("a/ui://x", { type: "tool-progress", progress: 1, total: 5, message: "step 1/5" })
+    reg.push("a/ui://x", { type: "tool-progress", progress: 5, total: 5, message: "step 5/5" })
+    firstUn()
+
+    // 模拟 iframe 重挂载：重新注册新 sink，应重放最近一次的 tool-progress。
+    const second: McpAppEvent[] = []
+    reg.register("a/ui://x", (e) => second.push(e))
+    expect(second).toEqual([{ type: "tool-progress", progress: 5, total: 5, message: "step 5/5" }])
+  })
+
+  test("broadcasts events to all sinks sharing the same app key", () => {
+    const reg = createMcpAppHostRegistry()
+    const timeline: McpAppEvent[] = []
+    const sidebar: McpAppEvent[] = []
+    reg.register("a/ui://x", (e) => timeline.push(e))
+    reg.register("a/ui://x", (e) => sidebar.push(e))
+
+    reg.push("a/ui://x", { type: "tool-progress", progress: 2, total: 5, message: "step 2/5" })
+    reg.push("a/ui://x", { type: "tool-progress", progress: 5, total: 5, message: "step 5/5" })
+
+    // 对话流工具卡与侧栏面板都应收到全部进度步骤。
+    expect(timeline).toHaveLength(2)
+    expect(sidebar).toHaveLength(2)
+    expect(timeline[1]).toEqual({ type: "tool-progress", progress: 5, total: 5, message: "step 5/5" })
+    expect(sidebar[1]).toEqual({ type: "tool-progress", progress: 5, total: 5, message: "step 5/5" })
+  })
 })
