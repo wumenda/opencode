@@ -15,10 +15,47 @@ const UI_HTML = `<!doctype html>
   </body>
 </html>`
 
+// 功能自包含的 step-ui（配置面），模拟真实 step-ui/dist/index.html：完成 AppBridge iframe 侧
+// 握手，并监听 notifications/progress 把 message + "进度 / 总量" 渲染进 body。
 const STEP_UI_HTML = `<!doctype html>
 <html>
   <head><meta charset="utf-8"><title>Step</title></head>
-  <body><h1 data-step-name>step</h1></body>
+  <body>
+    <div id="out">就绪</div>
+    <script>
+      var out = document.getElementById("out")
+      function render(params) {
+        var msg = (params && params.message) ? String(params.message) : ""
+        var progress = (params && typeof params.progress === "number") ? params.progress : 0
+        var total = (params && typeof params.total === "number") ? params.total : 0
+        if (msg) out.textContent = msg
+        else out.textContent = progress + " / " + total
+      }
+      var initId = null
+      var initiated = false
+      function send(o) { window.parent.postMessage(o, "*") }
+      function tryHandshake() {
+        if (initiated) return
+        initId = Date.now() + Math.floor(Math.random() * 1e5)
+        send({ jsonrpc: "2.0", id: initId, method: "ui/initialize",
+               params: { protocolVersion: "2025-06-18",
+                         appInfo: { name: "step", version: "1.0.0" },
+                         appCapabilities: {} } })
+      }
+      window.addEventListener("message", function (e) {
+        var d = e.data
+        if (!d || typeof d !== "object" || d.jsonrpc !== "2.0") return
+        if (d.id != null && d.id === initId && !initiated) {
+          initiated = true
+          send({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} })
+          return
+        }
+        if (d.method === "notifications/progress" && d.params) render(d.params)
+      })
+      setInterval(tryHandshake, 300)
+      tryHandshake()
+    </script>
+  </body>
 </html>`
 
 // 一张带进度通知的共享 step-ui，被两/三个不同 resourceUri 复用（供 step1/2/3 演示工具）。
@@ -185,6 +222,34 @@ test.describe("MCP Apps Panel", () => {
     // 切换 sub-tab 更新激活态
     await panel.getByRole("tab", { name: "ui://step2/progress.html" }).click()
     await expect(panel.getByRole("tab", { name: "ui://step2/progress.html" })).toHaveAttribute("aria-selected", "true")
+  })
+
+  test("forwards running tool progress into the step-ui iframe", async ({ page }) => {
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_skill_run", "skill", "completed", { name: "step-12" }),
+          toolPart("prt_step1_run", "ui-server_step1", "running", { iterations: 5 }, {
+            metadata: {
+              mcp: { server: "ui-server", tool: "step1", ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] } },
+              mcpProgress: { progress: 3, total: 5, message: "步骤一 3/5" },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://step1/progress.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // 进度 UI iframe 挂载后，握手完成 -> host 冲刷待转发事件 -> 进度应渲染进 iframe。
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe).toBeVisible()
+    const frame = iframe.contentFrame()
+    await expect(frame.getByText("步骤一 3/5")).toBeVisible()
   })
 
   test("shows empty state when no MCP apps", async ({ page }) => {

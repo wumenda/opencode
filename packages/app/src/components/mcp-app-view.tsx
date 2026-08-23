@@ -63,6 +63,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
 
   let client: Client | undefined
   let bridge: AppBridge | undefined
+  let appTransport: PostMessageTransport | undefined
   let revoke: (() => void) | undefined
   let unregister: (() => void) | undefined
   let containerRef: HTMLDivElement | undefined
@@ -93,6 +94,15 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     if (event.type === "tool-input-partial") void bridge.sendToolInputPartial({ arguments: event.arguments })
     else if (event.type === "tool-result") void bridge.sendToolResult(event.result as CallToolResult)
     else if (event.type === "tool-cancelled") void bridge.sendToolCancelled({ reason: event.reason })
+    else if (event.type === "tool-progress") {
+      // 标准 MCP progress 通知透传进 iframe：AppBridge 无专用发送方法，
+      // 直接用底层 PostMessageTransport 发 notifications/progress（iframe 侧 mcpApp 已解析）。
+      if (!appTransport) return
+      const params: Record<string, unknown> = { progress: event.progress }
+      if (event.total !== undefined) params["total"] = event.total
+      if (event.message !== undefined) params["message"] = event.message
+      void appTransport.send({ jsonrpc: "2.0", method: "notifications/progress", params })
+    }
   }
   const handleEvent: McpAppSink = (event) => {
     if (!bridge || !appInitialized) {
@@ -252,9 +262,13 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     }
     next.oninitialized = () => {
       // App 就绪后标记已初始化并回放 fallbackData（契约 1）。
-      // pending 事件要等 `bridge` 赋值后再冲刷（见 connect 成功处），否则会被 forward 丢弃。
+      // 须在此处也冲刷 pending：running 阶段推送的 tool-progress 可能在 connect 返回
+      // 之前入 pending，而此时 host 的手势（ui/initialize 往返）往往晚于 connect 完成，
+      // 导致下方 connect 之后那一次 drainPending 已跑完而拿不到这些事件（进度卡住）。
+      // bridge 未就绪时 forward 为无害 no-op，故此处只在 bridge 已赋值时才能真正转发。
       appInitialized = true
       if (props.fallbackData) void next.sendToolResult(props.fallbackData)
+      if (bridge) drainPending()
     }
     next.onopenlink = async (params) => {
       platform.openExternal(params.url)
@@ -321,6 +335,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     }
     try {
       const transport = new PostMessageTransport(iframe.contentWindow, iframe.contentWindow)
+      appTransport = transport
       // Log host -> iframe `ui/notifications/*` dispatch (diagnostics only, no UI).
       const baseSend = transport.send.bind(transport)
       transport.send = async (message, options) => {
