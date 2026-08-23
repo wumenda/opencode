@@ -93,10 +93,14 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   // 事件先入 pending，oninitialized 后统一冲刷转发进 iframe。
   let appInitialized = false
   const pending: McpAppEvent[] = []
+  // Solid store 的响应式 Proxy 无法被 postMessage 结构化克隆（DataCloneError），
+  // 统一在发送边界把 store 派生的载荷反序列化为纯对象（MCP 载荷始终是 JSON 数据）。
+  const toPlain = (value: unknown) => JSON.parse(JSON.stringify(value))
   const forward = (event: McpAppEvent) => {
     if (!bridge) return
-    if (event.type === "tool-input-partial") void bridge.sendToolInputPartial({ arguments: event.arguments })
-    else if (event.type === "tool-result") void bridge.sendToolResult(event.result as CallToolResult)
+    if (event.type === "tool-input-partial")
+      void bridge.sendToolInputPartial({ arguments: toPlain(event.arguments) })
+    else if (event.type === "tool-result") void bridge.sendToolResult(toPlain(event.result) as CallToolResult)
     else if (event.type === "tool-cancelled") void bridge.sendToolCancelled({ reason: event.reason })
     else if (event.type === "tool-progress") {
       // 标准 MCP progress 通知透传进 iframe：AppBridge 无专用发送方法，
@@ -109,9 +113,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       if (event.total !== undefined) params["total"] = event.total
       if (event.message !== undefined) params["message"] = event.message
       // uiEvent 扩展字段透传进 iframe（iframe 侧从 progress.uiEvent.<key> 读取逐步渲染数据）。
-      // Solid store 的响应式 Proxy 无法被 postMessage 结构化克隆（DataCloneError），
-      // 先反序列化为纯对象再发送；MCP progress params 始终是 JSON 数据，JSON 往返安全。
-      if (event.uiEvent !== undefined) params["uiEvent"] = JSON.parse(JSON.stringify(event.uiEvent))
+      if (event.uiEvent !== undefined) params["uiEvent"] = toPlain(event.uiEvent)
       console.log("[mcp-app] tool-progress forward", { progress: event.progress, hasUiEvent: event.uiEvent !== undefined })
       void appTransport.send({ jsonrpc: "2.0", method: "notifications/progress", params })
     }
