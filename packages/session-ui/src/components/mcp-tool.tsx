@@ -107,8 +107,10 @@ export function McpTool(props: {
   const host = useMcpAppHost()
   const app = createMemo(() => mcpAppFromPart(props.part))
   const progress = createMemo(() => mcpProgressFromPart(props.part))
-  // McpAppHost 事件按 sessionID 隔离：key 带上 part 归属会话，避免跨 session 串扰。
-  const appKey = (info: McpAppInfo) => `${props.part.sessionID}:${info.server}/${info.resourceUri}`
+  // McpAppHost 事件按 sessionID + 调用实例隔离：key 带上 part 归属会话与实例 id，
+  // 同一 server/resourceUri 的多次调用（不同 part.id）互不串扰，各自定格。
+  const appKey = (info: McpAppInfo) =>
+    `${props.part.sessionID}:${info.server}/${info.resourceUri}:${info.instanceID}`
 
   // 当前 running 状态的输入，作为流式部分输入推送给已挂载的 App。
   const runningInput = createMemo<Record<string, unknown> | undefined>(() => {
@@ -196,9 +198,10 @@ export function McpTool(props: {
         onOpenChange={props.onOpenChange}
         defer={props.deferContent}
       >
-        {/* Non-keyed on purpose: part updates must not remount the sandboxed app iframe. */}
+        {/* Keyed by instanceID: 同一调用实例的 part 更新（running→completed）不重挂载 iframe，
+            不同调用实例各自独立挂载。 */}
         <Show when={app()}>
-          {(info) => renderApp?.({ ...info(), sessionID: props.part.sessionID })}
+          {(info) => renderApp?.({ ...info(), sessionID: props.part.sessionID, instanceID: info().instanceID })}
         </Show>
       </BasicTool>
       <Show when={progress()}>
