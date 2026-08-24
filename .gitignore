@@ -32,3 +32,6 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Event capture logs (debug artifacts, can be very large)
+scripts/event-capture.txt
