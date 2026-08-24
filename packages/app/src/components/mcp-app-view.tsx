@@ -100,6 +100,10 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     if (!bridge) return
     if (event.type === "tool-input-partial")
       void bridge.sendToolInputPartial({ arguments: toPlain(event.arguments) })
+    else if (event.type === "tool-input")
+      // 完整版入参：AppBridge 发送 ui/notifications/tool-input——UI 模板实际监听的
+      // method（partial 对应的 tool-input-partial 模板侧普遍不处理）。
+      void bridge.sendToolInput({ arguments: toPlain(event.arguments) })
     else if (event.type === "tool-result") void bridge.sendToolResult(toPlain(event.result) as CallToolResult)
     else if (event.type === "tool-cancelled") void bridge.sendToolCancelled({ reason: event.reason })
     else if (event.type === "tool-progress") {

@@ -1,4 +1,4 @@
-# 停止 opencode 前端、后端和 pdf2json MCP 服务
+# 停止 opencode 后端和前端服务，释放端口
 # 递归杀掉进程树（bun 会 spawn 子进程，端口可能被子进程持有）
 
 function Stop-ProcessTree($processId) {
@@ -11,7 +11,7 @@ function Stop-ProcessTree($processId) {
 
 $stopped = @()
 
-foreach ($port in 4096, 4444, 8000) {
+foreach ($port in 4096, 4444) {
     $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
     if ($conns) {
         $conns | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {
@@ -32,7 +32,7 @@ if ($stopped.Count -gt 0) {
 }
 
 # 等待端口释放（最多 10 秒）
-$ports = 4096, 4444, 8000
+$ports = 4096, 4444
 for ($i = 0; $i -lt 20; $i++) {
     $busy = $false
     foreach ($port in $ports) {

@@ -7,21 +7,24 @@
  *   3. tool-result.structuredContent.image_path（工具返回，兜底）
  *   4. tool-result.structuredContent.image_paths[0]（多页工具返回，兜底）
  *
- * 同一 path 只请求一次（ref 去重）。请求失败时返回 null（编辑器无背景图也能工作）。
+ * 同一 path 只请求一次（ref 去重）。请求失败时返回 null（编辑器无背景图也能工作），
+ * 并暴露 retry() 供 UI 在失败后手动重拉（重试前清除 ref 去重，避免永久卡在失败态）。
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMcpApp, mcpApp } from '@/core/mcpApp';
 
 export function useToolImage(): {
   imageUrl: string | null;
   loading: boolean;
   error: string | null;
+  retry: () => void;
 } {
   const { toolInput, toolResult, progress } = useMcpApp();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fetchedPathRef = useRef<string | null>(null);
+  const retryTick = useRef(0);
 
   // 从 progress / tool-input.args / tool-result.structuredContent 提取 image_path
   const imagePath = useMemo(() => {
@@ -48,6 +51,13 @@ export function useToolImage(): {
     return null;
   }, [progress, toolInput, toolResult]);
 
+  // 手动重试：清掉 ref 去重与错误态，效果依赖 changes 后重新请求同一 imagePath。
+  const retry = useCallback(() => {
+    fetchedPathRef.current = null;
+    setError(null);
+    retryTick.current += 1;
+  }, []);
+
   useEffect(() => {
     if (!imagePath || fetchedPathRef.current === imagePath) return;
     fetchedPathRef.current = imagePath;
@@ -67,10 +77,11 @@ export function useToolImage(): {
         }
       })
       .catch((e) => {
+        // 失败不清 ref 去重，避免同一 path 无限自动重试；由 retry() 主动重试。
         setError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => setLoading(false));
-  }, [imagePath]);
+  }, [imagePath, retryTick.current]);
 
-  return { imageUrl, loading, error };
+  return { imageUrl, loading, error, retry };
 }

@@ -13,7 +13,7 @@ import { ExtractionProgress } from './ExtractionProgress';
 interface ExtractionWithImageProps {}
 
 export function ExtractionWithImage({}: ExtractionWithImageProps) {
-  const { imageUrl, loading, error } = useToolImage();
+  const { imageUrl, loading, error, retry } = useToolImage();
 
   return (
     <div className="grid h-full grid-cols-[1fr_360px] overflow-hidden">
@@ -25,8 +25,15 @@ export function ExtractionWithImage({}: ExtractionWithImageProps) {
           </div>
         )}
         {error && !loading && (
-          <div className="m-4 rounded border border-red/30 bg-red/5 p-3 text-xs text-red">
-            源图加载失败：{error}
+          <div className="m-4 flex h-full flex-col items-center justify-center gap-3 rounded border border-red/30 bg-red/5 p-3 text-xs text-red">
+            <span>源图加载失败：{error}</span>
+            <button
+              type="button"
+              onClick={retry}
+              className="cursor-pointer rounded border border-accent/40 bg-accent/10 px-3 py-1 text-xs text-accent transition hover:bg-accent/20"
+            >
+              重试加载源图
+            </button>
           </div>
         )}
         {!loading && !error && imageUrl && (
@@ -40,7 +47,7 @@ export function ExtractionWithImage({}: ExtractionWithImageProps) {
           </div>
         )}
       </div>
-      {/* 右：事件时间线 */}
+      {/* 右：事件时间线（独立，图片失败不阻塞提取进度展示） */}
       <ExtractionProgress />
     </div>
   );

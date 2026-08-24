@@ -1,7 +1,7 @@
 """``duck`` 协议的 MCP 实现侧：``Content`` 与 ``HostClient`` 及基础设施。"""
 
 from .content import MCPContent, _send_progress_with_data
-from .host_client import MCPHostClient
+from .host_client import HostClient
 from ._common import (
     ReviewRegistry,
     _get_ui_html,
@@ -15,7 +15,7 @@ from ._common import (
 
 __all__ = [
     "MCPContent",
-    "MCPHostClient",
+    "HostClient",
     "ReviewRegistry",
     "_get_ui_html",
     "_send_progress_with_data",

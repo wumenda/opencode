@@ -24,6 +24,12 @@ const FileContent = Schema.Struct({
   mime: Schema.String,
 })
 
+// save_file 的请求体不含 path，path 来自 URL 通配符段
+const WritePayload = Schema.Struct({
+  content: Schema.String,
+  encoding: Schema.Literals(["utf8", "base64"]).pipe(Schema.optional),
+})
+
 export const FileSystemGroup = HttpApiGroup.make("server.fs")
   .add(
     HttpApiEndpoint.get("fs.read", "/api/fs/read/*", {
@@ -84,7 +90,7 @@ export const FileSystemGroup = HttpApiGroup.make("server.fs")
   .add(
     HttpApiEndpoint.put("fs.saveFile", "/api/fs/save/*", {
       query: LocationQuery,
-      payload: FileSystem.WriteInput,
+      payload: WritePayload,
       success: HttpApiSchema.NoContent,
     })
       .annotateMerge(locationQueryOpenApi)

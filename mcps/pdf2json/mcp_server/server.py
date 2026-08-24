@@ -26,21 +26,33 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.core import get_logger, setup_logging
 
-from .duck_implement import MCPHostClient
+from .duck_implement import HostClient
 
 # ---------------------------------------------------------------------------
 # HostClient 全局单例（AGENT.md 要求：全进程共享，禁止 tools.py 就地构造）
 # 定义在 tools 导入之前，避免 tools.py 反向导入时产生循环依赖。
 #
-# 使用 MCPHostClient：PDF 经 get_file 从远端文件服务读取、最终 JSON 经
-# save_file 写回远端；渲染出的中间图片落到本地供上游读取（豁免 #5）。
-# 远端文件服务地址从环境变量 FILE_SERVICE_URL 读取，默认 http://localhost:9000。
+# 使用 HostClient：PDF 经 get_file 从 opencode host 工作区读取、最终 JSON 经
+# save_file 写回工作区；渲染出的中间图片落到本地供上游读取（豁免 #5）。
+# host 地址 / 凭据 / 工作区从环境变量读取：
+#   - OPENCODE_HOST_URL         host 基址（默认 http://127.0.0.1:4097）
+#   - OPENCODE_SERVER_USERNAME  Basic Auth 用户名（默认 opencode）
+#   - OPENCODE_SERVER_PASSWORD  host 口令（与 opencode serve 一致）
+#   - OPENCODE_WORKSPACE        工作区绝对路径（作为 location[directory]）
 # ---------------------------------------------------------------------------
-_file_service_url = os.getenv("FILE_SERVICE_URL", "http://localhost:9000")
-_host_client_singleton = MCPHostClient(base_url=_file_service_url)
+_host_url = os.getenv("OPENCODE_HOST_URL", os.getenv("FILE_SERVICE_URL", "http://127.0.0.1:4097"))
+_host_username = os.getenv("OPENCODE_SERVER_USERNAME", "opencode")
+_host_password = os.getenv("OPENCODE_SERVER_PASSWORD", "")
+_host_workspace = os.getenv("OPENCODE_WORKSPACE", "D:\\项目\\AI-For-Redesign\\代码库\\mock_file_server\\file_storage")
+_host_client_singleton = HostClient(
+    base_url=_host_url,
+    username=_host_username,
+    password=_host_password,
+    workspace=_host_workspace,
+)
 
 
-def get_host_client() -> MCPHostClient:
+def get_host_client() -> HostClient:
     """返回全进程共享的 HostClient 单例。"""
     return _host_client_singleton
 
@@ -98,7 +110,7 @@ register_tools(mcp)
 # ---------------------------------------------------------------------------
 def main() -> None:
     host = os.getenv("MCP_HOST", "127.0.0.1")
-    port = int(os.getenv("MCP_PORT", "8000"))
+    port = int(os.getenv("MCP_PORT", "8008"))
     cors_origins = os.getenv("MCP_CORS_ORIGINS", "*").split(",")
     if cors_origins == ["*"] and host == "0.0.0.0":
         logger.warning(

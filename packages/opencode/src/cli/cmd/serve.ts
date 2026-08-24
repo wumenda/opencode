@@ -19,6 +19,18 @@ export const ServeCommand = effectCmd({
     const server = yield* Effect.promise(() => Server.listen(opts))
     console.log(`opencode server listening on http://${server.hostname}:${server.port}`)
 
-    yield* Effect.never
+    yield* Effect.promise<void>(
+      () =>
+        new Promise(() => {
+          let shuttingDown = false
+          const shutdown = () => {
+            if (shuttingDown) return
+            shuttingDown = true
+            server.stop(true).finally(() => process.exit(0))
+          }
+          process.on("SIGINT", shutdown)
+          process.on("SIGTERM", shutdown)
+        }),
+    )
   }),
 })

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>opencode host 文件接口测试客户端</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --panel-2: #1e222b;
+        --border: #2a2f3a;
+        --text: #d7dce4;
+        --muted: #8b93a1;
+        --accent: #4c9aff;
+        --ok: #3fb950;
+        --err: #f85149;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+        padding: 24px;
+      }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .sub { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+      .grid {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .panel h2 { font-size: 14px; margin: 0 0 12px; }
+      label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+      input[type="text"], input[type="password"], textarea {
+        width: 100%;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        padding: 8px 10px;
+        font: 13px var(--mono);
+      }
+      textarea { resize: vertical; min-height: 90px; }
+      input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+      button {
+        background: var(--accent);
+        border: none;
+        color: #fff;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 13px;
+        cursor: pointer;
+        margin-top: 12px;
+      }
+      button:hover { filter: brightness(1.1); }
+      button.secondary { background: #333a46; }
+      .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+      .row button { margin-top: 0; }
+      .status { font: 12px var(--mono); margin-left: auto; }
+      .status.ok { color: var(--ok); }
+      .status.err { color: var(--err); }
+      .log {
+        margin-top: 16px;
+        background: #0b0d11;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        font: 12px/1.5 var(--mono);
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 340px;
+        overflow: auto;
+      }
+      .log .head { color: var(--accent); font-weight: bold; }
+      .log .ok { color: var(--ok); }
+      .log .err { color: var(--err); }
+      .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+      .download { display: inline-block; color: var(--accent); margin-left: 8px; cursor: pointer; text-decoration: underline; }
+      #rawToggle { cursor: pointer; user-select: none; }
+    </style>
+  </head>
+  <body>
+    <h1>opencode host 文件接口测试客户端</h1>
+    <div class="sub">测试 <code>GET /api/fs/get/*</code> 与 <code>PUT /api/fs/save/*</code>（含 Basic Auth 与 location 定位）</div>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>连接配置</h2>
+        <label>Host 基址</label>
+        <input id="baseUrl" type="text" value="http://127.0.0.1:4096" />
+        <label>用户名（默认 opencode）</label>
+        <input id="username" type="text" value="opencode" />
+        <label>密码（OPENCODE_SERVER_PASSWORD，无鉴权可留空）</label>
+        <input id="password" type="password" />
+        <label>工作区绝对路径（location[directory]）</label>
+        <input id="workspace" type="text" value="C:\\Users\\me\\workspace" />
+        <div class="hint">两个接口都会带上该路径作为 <code>location[directory]</code> 查询参数。</div>
+      </div>
+
+      <div>
+        <div class="panel" style="margin-bottom: 16px">
+          <h2>get_file — 读取工作区文件</h2>
+          <label>相对路径（如 src/main.ts、output/topology.json）</label>
+          <input id="getPath" type="text" value="README.md" />
+          <div class="row">
+            <button id="getBtn">读取</button>
+            <span id="getStatus" class="status"></span>
+          </div>
+          <div id="getResult" class="log" hidden></div>
+        </div>
+
+        <div class="panel">
+          <h2>save_file — 保存文件到工作区</h2>
+          <label>相对路径（如 output/plan.pdf）</label>
+          <input id="savePath" type="text" value="output/hello.txt" />
+          <label>内容（文本 / JSON）或选择文件（自动按 base64 上传）</label>
+          <textarea id="saveContent" placeholder='{"nodes": [], "edges": []} 或任意文本'></textarea>
+          <div class="row">
+            <label style="margin:0"><input id="saveFileInput" type="file" /> 选择本地文件（二进制）</label>
+          </div>
+          <div class="row">
+            <button id="saveBtn">保存</button>
+            <button id="clearBtn" class="secondary">清空内容</button>
+            <span id="saveStatus" class="status"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top: 16px">
+      <h2><span id="rawToggle">▸</span> 原始响应</h2>
+      <div id="rawLog" class="log" hidden></div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id)
+
+      function authHeader() {
+        const u = $("username").value
+        const p = $("password").value
+        if (!u && !p) return {}
+        return { Authorization: "Basic " + btoa(u + ":" + p) }
+      }
+
+      function locParams() {
+        const ws = $("workspace").value.trim()
+        return ws ? { "location[directory]": ws } : {}
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
+      }
+
+      const logEl = $("rawLog")
+      let logShown = false
+      function log(head, detail, ok) {
+        logEl.hidden = false
+        $("rawToggle").textContent = "▾"
+        logShown = true
+        const block = document.createElement("div")
+        block.innerHTML = `<div class="${ok ? "ok" : "err"}">${escapeHtml(head)}</div>` + (detail ? `<pre>${escapeHtml(detail)}</pre>` : "")
+        logEl.prepend(block)
+        logEl.scrollTop = 0
+      }
+      function toggleRaw() {
+        logShown = !logShown
+        logEl.hidden = !logShown
+        $("rawToggle").textContent = logShown ? "▾" : "▸"
+      }
+      $("rawToggle").addEventListener("click", toggleRaw)
+
+      function setStatus(el, text, ok) {
+        el.textContent = text
+        el.className = "status " + (ok === undefined ? "" : ok ? "ok" : "err")
+      }
+
+      // get_file
+      $("getBtn").addEventListener("click", async () => {
+        const base = $("baseUrl").value.replace(/\/+$/, "")
+        const path = $("getPath").value.trim()
+        const st = $("getStatus")
+        const box = $("getResult")
+        if (!base || !path) return setStatus(st, "请填写基址与路径", false)
+        setStatus(st, "请求中…")
+        const url = base + "/api/fs/get/" + encodeURIComponent(path)
+        try {
+          const resp = await fetch(url, { headers: authHeader() })
+          const text = await resp.text()
+          log(`GET ${url} -> ${resp.status}`, text, resp.ok)
+          if (!resp.ok) return setStatus(st, `HTTP ${resp.status}`, false)
+          const body = JSON.parse(text)
+          const data = body.data ?? body
+          box.hidden = false
+          const enc = data.encoding
+          if (enc === "base64") {
+            const bin = atob(data.content)
+            const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+            const blobUrl = URL.createObjectURL(new Blob([bytes], { type: data.mime || "application/octet-stream" }))
+            box.innerHTML =
+              `<div class="head">mime: ${escapeHtml(data.mime)} · encoding: base64 · ${bytes.length} 字节</div>` +
+              `<div><a class="download" href="${blobUrl}" download="${escapeHtml(data.name)}">⬇ 下载 ${escapeHtml(data.name)}</a></div>`
+          } else {
+            const pretty = /json/i.test(data.mime || "") ? JSON.stringify(JSON.parse(data.content), null, 2) : data.content
+            box.innerHTML = `<div class="head">mime: ${escapeHtml(data.mime)} · encoding: utf8</div><div>${escapeHtml(pretty)}</div>`
+          }
+          setStatus(st, `HTTP ${resp.status} · 成功`, true)
+        } catch (e) {
+          setStatus(st, "请求失败", false)
+          log("GET 失败", String(e), false)
+        }
+      })
+
+      // save_file
+      $("saveBtn").addEventListener("click", async () => {
+        const base = $("baseUrl").value.replace(/\/+$/, "")
+        const path = $("savePath").value.trim()
+        const st = $("saveStatus")
+        const file = $("saveFileInput").files[0]
+        if (!base || !path) return setStatus(st, "请填写基址与路径", false)
+        setStatus(st, "请求中…")
+        let payload
+        if (file) {
+          const buf = await file.arrayBuffer()
+          const bytes = new Uint8Array(buf)
+          let bin = ""
+          const chunk = 0x8000
+          for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i + chunk))
+          payload = { content: btoa(bin), encoding: "base64" }
+        } else {
+          payload = { content: $("saveContent").value, encoding: "utf8" }
+        }
+        const url = base + "/api/fs/save/" + encodeURIComponent(path)
+        const params = new URLSearchParams(locParams())
+        const qs = params.toString() ? "?" + params : ""
+        try {
+          const resp = await fetch(url + qs, {
+            method: "PUT",
+            headers: { ...authHeader(), "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+          const text = await resp.text()
+          log(`PUT ${url} -> ${resp.status}`, text || "(204 No Content)", resp.ok)
+          setStatus(st, resp.ok ? `HTTP ${resp.status} · 已保存` : `HTTP ${resp.status}`, resp.ok)
+        } catch (e) {
+          setStatus(st, "请求失败", false)
+          log("PUT 失败", String(e), false)
+        }
+      })
+
+      $("clearBtn").addEventListener("click", () => {
+        $("saveContent").value = ""
+        $("saveFileInput").value = ""
+      })
+
+      $("saveFileInput").addEventListener("change", (e) => {
+        const f = e.target.files[0]
+        if (f) $("saveContent").value = `[将作为二进制上传：${f.name}，${f.size} 字节]`
+      })
+    </script>
+  </body>
+</html>

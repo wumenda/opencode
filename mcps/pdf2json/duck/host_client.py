@@ -10,8 +10,8 @@
     - ``get_file``: 按路径读取文件，返回 dict（JSON）或 bytes（二进制）。
 
 实现示例：
-- ``mcp_server.duck_implement.MCPHostClient``：MCP 服务实现，通过 HTTP 与远端
-  文件服务交互。
+- ``mcp_server.duck_implement.HostClient``：MCP 服务实现，通过 HTTP 调用 opencode
+  host 的 /api/fs/get 与 /api/fs/save 端点与工作区交互。
 - ``entry._common.EntryHostClient``：CLI entry 脚本实现，独立于 MCP 服务，
   便于按需调整本地存储策略。
 """

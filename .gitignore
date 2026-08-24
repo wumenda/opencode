@@ -35,3 +35,9 @@ tsconfig.tsbuildinfo
 
 # Event capture logs (debug artifacts, can be very large)
 scripts/event-capture.txt
+
+# Python bytecode caches
+__pycache__/
+
+# Local test output
+output/

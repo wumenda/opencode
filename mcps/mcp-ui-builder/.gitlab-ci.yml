@@ -1,0 +1,70 @@
+# GitLab CI/CD - mcp-ui-builder (mcp-apps-ui + server_example)
+# 流程：构建 mcp-apps-ui 前端 -> 启动 MCP 后端服务（端口 4097）
+#
+# Runner 类型：shell executor（无 Docker，需预装 node/npm 与 python3/pip）
+# 各 UI 项目的 dist 不入库，推送后在 CI 中重新构建，产物经 artifact 传递给 deploy。
+
+variables:
+  # MCP 服务器监听配置（server_example/server.py 读取）
+  MCP_HOST: "0.0.0.0"
+  MCP_PORT: "4097"
+  NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+
+stages:
+  - build
+  - deploy
+
+# ── 构建阶段：构建 mcp-apps-ui 下三个 UI（simple / progress / review）──
+# 产物为各 ui 项目的 dist/index.html，由 server_example 的资源接口返回给宿主。
+build:ui:
+  stage: build
+  script:
+    - |
+      for ui_dir in mcp-apps-ui/*/ui/; do
+        echo "[BUILD] ${ui_dir}"
+        (cd "${ui_dir}" && npm ci && npm run build)
+      done
+  cache:
+    key: node-modules-$CI_COMMIT_REF_SLUG
+    paths:
+      - mcp-apps-ui/*/ui/node_modules
+  artifacts:
+    when: on_success
+    paths:
+      - mcp-apps-ui/*/ui/dist
+    expire_in: 1 day
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - when: manual
+
+# ── 部署阶段：启动 MCP 后端服务（server_example.server）──
+# 长驻服务以后台方式运行，job 启动后即正常结束，不会挂起。
+# 仅在默认分支触发；其他分支可手动运行。
+deploy:mcp-server:
+  stage: deploy
+  needs: ["build:ui"]
+  script:
+    - python3 -m pip install --quiet "fastmcp>=3.4.4"
+    # 停止占用端口的旧实例（首次部署无旧进程时忽略错误）
+    - fuser -k ${MCP_PORT}/tcp || true
+    - sleep 1
+    # setsid 新建会话并重定向全部标准流，彻底脱离终端，否则 job 永不结束
+    - setsid python3 -m server_example.server > mcp-server.log 2>&1 < /dev/null &
+    - sleep 8
+    # 验证服务是否启动成功：检查端口是否处于监听状态
+    - |
+      if fuser ${MCP_PORT}/tcp >/dev/null 2>&1; then
+        echo "[SUCCESS] MCP 服务已成功启动，监听端口 ${MCP_PORT}"
+      else
+        echo "[FAILED] MCP 服务启动失败，端口 ${MCP_PORT} 未监听"
+        cat mcp-server.log
+        exit 1
+      fi
+    - cat mcp-server.log
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - when: manual

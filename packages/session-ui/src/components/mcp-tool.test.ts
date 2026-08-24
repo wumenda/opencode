@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { ToolPart } from "@opencode-ai/sdk/v2"
-import { mcpAppFromPart, mcpProgressFromPart, skillNameFromPart } from "./mcp-tool"
+import { mcpAppFromPart, mcpProgressFromPart, skillNameFromPart, toolInputFromPart } from "./mcp-tool"
 
 function part(input: {
   id?: string
@@ -119,6 +119,29 @@ describe("mcpProgressFromPart", () => {
   test("returns undefined when progress is not a number", () => {
     const progress = mcpProgressFromPart(part({ status: "running", stateMetadata: { mcpProgress: { progress: "5" } } }))
     expect(progress).toBeUndefined()
+  })
+})
+
+describe("toolInputFromPart", () => {
+  test("returns the input while the tool is running", () => {
+    expect(toolInputFromPart(part({ status: "running", inputValue: { input_path: "a.pdf" } }))).toEqual({ input_path: "a.pdf" })
+  })
+
+  test("returns the input after completion for late-mounted apps", () => {
+    // 无 progress 的快速工具：metadata.mcp 直到 completed 才写入，tool-input 只能在
+    // completed 后补推，否则晚挂载的 App 因 toolInput 缺失卡"等待任务"。
+    expect(toolInputFromPart(part({ status: "completed", inputValue: { input_path: "a.pdf" } }))).toEqual({ input_path: "a.pdf" })
+  })
+
+  test("returns undefined for pending and error parts", () => {
+    expect(toolInputFromPart(part({ status: "pending", inputValue: { input_path: "a.pdf" } }))).toBeUndefined()
+    expect(toolInputFromPart(part({ status: "error", inputValue: { input_path: "a.pdf" } }))).toBeUndefined()
+  })
+
+  test("returns undefined for non-object input", () => {
+    const p = part({ status: "running" })
+    ;(p.state as { input: unknown }).input = "not-an-object"
+    expect(toolInputFromPart(p)).toBeUndefined()
   })
 })
 

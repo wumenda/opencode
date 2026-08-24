@@ -76,6 +76,17 @@ export function mcpProgressFromPart(part: ToolPart): McpProgressInfo | undefined
   }
 }
 
+/** Extracts the tool input to push as tool-input-partial: while running (streaming)
+ *  and once after completion — tools without progress notifications only get
+ *  metadata.mcp when completed, so the final input push is the only chance
+ *  late-mounted apps have to receive it (otherwise they stick on "等待任务"). */
+export function toolInputFromPart(part: ToolPart): Record<string, unknown> | undefined {
+  if (part.state.status !== "running" && part.state.status !== "completed") return
+  const input = part.state.input
+  // 仅接受纯对象输入，非纯对象则跳过推送。
+  return typeof input === "object" && input !== null ? (input as Record<string, unknown>) : undefined
+}
+
 /** Extracts the persisted final progress from a completed tool part, for iframe replay after refresh. */
 export function completedProgressFromPart(part: ToolPart): McpProgressInfo | undefined {
   if (part.state.status !== "completed") return
@@ -112,20 +123,21 @@ export function McpTool(props: {
   const appKey = (info: McpAppInfo) =>
     `${props.part.sessionID}:${info.server}/${info.resourceUri}:${info.instanceID}`
 
-  // 当前 running 状态的输入，作为流式部分输入推送给已挂载的 App。
-  const runningInput = createMemo<Record<string, unknown> | undefined>(() => {
-    if (props.part.state.status !== "running") return undefined
-    const input = props.part.state.input
-    // 仅接受纯对象输入，非纯对象则跳过推送。
-    return typeof input === "object" && input !== null ? (input as Record<string, unknown>) : undefined
-  })
+  // 当前 running/completed 状态的输入：MCP 工具参数在调用时一次性确定，完整版
+  // tool-input（UI 模板实际监听的 method）在 running 与 completed 都推送——无 progress
+  // 的快速工具 metadata.mcp 直到 completed 才写入，晚挂载的面板 tab 依赖注册表
+  // lastToolInput 重放兜底，否则 App 因 toolInput 缺失卡"等待任务"。
+  const partInput = createMemo(() => toolInputFromPart(props.part))
 
-  // 工具运行中且已渲染 App 时，把部分输入推送给宿主注册表（由 McpAppView 转发进 iframe）。
+  // 工具运行中/完成且已渲染 App 时，把输入推送给宿主注册表（由 McpAppView 转发进 iframe）。
+  // partial 保留流式语义（渐进渲染参数的 App / e2e 断言沿用），完整版供只监听
+  // ui/notifications/tool-input 的模板使用。
   createEffect(() => {
     const info = app()
-    const input = runningInput()
+    const input = partInput()
     if (!info || !input) return
     host.push(appKey(info), { type: "tool-input-partial", arguments: input })
+    host.push(appKey(info), { type: "tool-input", arguments: input })
   })
 
   // 工具 completed 且携带 metadata.mcp.result 时，把最终结果推送给已挂载的 App。

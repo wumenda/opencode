@@ -1,4 +1,4 @@
-"""HttpHostClient：通过 opencode host 的 /api/fs/get 与 /api/fs/save 端点实现的 HostClient。
+"""HostClient：通过 opencode host 的 /api/fs/get 与 /api/fs/save 端点实现的 HostClient。
 
 与 host_client.py 的 ``HostClient`` 鸭子类型协议兼容：
     - ``save_file(path, data)``：dict -> JSON(utf8)；bytes -> base64；str -> 文本(utf8)。
@@ -19,7 +19,7 @@ import requests
 BodyValue = Union[dict, bytes, str]
 
 
-class HttpHostClient:
+class HostClient:
     """通过 host HTTP 端点访问工作区文件的 HostClient 实现。"""
 
     def __init__(
