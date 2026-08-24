@@ -21,6 +21,7 @@ function renderMcpApp(input: McpAppRendererInput) {
       server={input.server}
       resourceUri={input.resourceUri}
       sessionID={input.sessionID}
+      instanceID={input.instanceID}
       fallbackData={
         typeof input.fallbackData === "object" && input.fallbackData !== null
           ? (input.fallbackData as CallToolResult)
