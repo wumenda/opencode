@@ -427,6 +427,78 @@ test.describe("MCP Apps Panel", () => {
     )
   })
 
+  test("keeps focus on the newest tool when a later skill part re-groups it", async ({ page }) => {
+    // 回归：t2 先以 step-12 标记（step-13 skill part 尚为 pending），随后 step-13 生效
+    // 把 t2 重标到新组。修复前 activeSkill 停留旧组、activeTool memo 静默回退第一个
+    // iframe（内容闪回 step1）；修复后焦点跟随最新分组，内容必须仍是 step2。
+    const stepOneHtml = STEP_UI_HTML.replace("<title>Step</title>", "<title>Step One</title>").replace(
+      '<div id="out">就绪</div>',
+      '<div id="out">Step One 就绪</div>',
+    )
+    const stepTwoHtml = STEP_UI_HTML.replace("<title>Step</title>", "<title>Step Two</title>").replace(
+      '<div id="out">就绪</div>',
+      '<div id="out">Step Two 就绪</div>',
+    )
+
+    const timeline = await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          // part 在 sync store 中按 id 字典序排列，因此用 a<b<c<d 控制顺序：
+          // step-12 → step1 → step-13(pending 未生效) → step2（此时 step2 归 step-12）。
+          toolPart("prt_a_skill12", "skill", "completed", { name: "step-12" }),
+          toolPart("prt_b_step1", "ui-server_step1", "completed", {}, {
+            metadata: {
+              mcp: { server: "ui-server", tool: "step1", ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] } },
+            },
+          }),
+          toolPart("prt_c_skill13", "skill", "pending", { name: "step-13" }),
+          toolPart("prt_d_step2", "ui-server_step2", "completed", {}, {
+            metadata: {
+              mcp: { server: "ui-server", tool: "step2", ui: { resourceUri: "ui://step2/progress.html", visibility: ["model", "app"] } },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: {
+        servers: [{ name: "ui-server" }],
+        rpc: ({ method, params }: { name: string; method: string; params: unknown }) => {
+          if (method === "initialize") {
+            return {
+              protocolVersion: "2025-06-18",
+              capabilities: {},
+              serverInfo: { name: "ui-server", version: "1.0.0" },
+            }
+          }
+          if (method === "resources/read") {
+            const uri = (params as { uri?: string }).uri
+            const text =
+              uri === "ui://step1/progress.html" ? stepOneHtml : uri === "ui://step2/progress.html" ? stepTwoHtml : ""
+            return { contents: [{ uri, mimeType: "text/html", text }] }
+          }
+          if (method === "tools/list") return { tools: [] }
+          return { _meta: {} }
+        },
+      },
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // step-13 生效前，t2 归入 step-12：焦点在 step2 #2，内容渲染 Step Two。
+    await expect(panel.getByRole("tab", { name: /step2 #2/ })).toHaveAttribute("aria-selected", "true")
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe.contentFrame().getByText("Step Two 就绪")).toBeVisible()
+
+    // step-13 skill part 生效 → t2 重标到 step-13 组（组内序号变为 #1）：
+    // 焦点必须跟随新分组，内容仍是 Step Two，不闪回 Step One。
+    await timeline.send(partUpdated(toolPart("prt_c_skill13", "skill", "completed", { name: "step-13" })))
+    await expect(panel.getByRole("tab", { name: /step2 #1/ })).toHaveAttribute("aria-selected", "true")
+    await expect(iframe.contentFrame().getByText("Step Two 就绪")).toBeVisible()
+    await expect(iframe.contentFrame().getByText("Step One 就绪")).not.toBeVisible()
+  })
+
   test("reloads the app iframe when switching between tool tabs", async ({ page }) => {
     // step1 / step3 各自返回不同标识文本的 UI HTML，用于断言切换后 iframe 确实重新加载了对应资源。
     const stepOneHtml = STEP_UI_HTML.replace("<title>Step</title>", "<title>Step One</title>").replace(
@@ -542,6 +614,48 @@ test.describe("MCP Apps Panel", () => {
     // 切回 step1 tab：iframe 重载后必须回放 step1 的最终进度，而非回退到 "就绪"。
     await panel.getByRole("tab", { name: /step1 #1/ }).click()
     await expect(iframe.contentFrame().getByText("步骤一：解析输入 5/5")).toBeVisible()
+  })
+
+  test("replays tool result after switching back to a completed tool tab", async ({ page }) => {
+    // 回归：step1 完成（携带 metadata.mcp.result）时面板聚焦在最新执行的 step2，其 sink 未注册；
+    // 切回 step1 tab 后 iframe 重挂载，必须重放 tool-result 渲染最终结果（result:ok），
+    // 而不是卡在启动/等待任务态（host 注册表 lastResult 重放）。
+    await setupTimeline(page, {
+      settings: { newLayoutDesigns: true },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart("prt_a_skill", "skill", "completed", { name: "step-12" }),
+          toolPart("prt_b_step1", "ui-server_step1", "completed", {}, {
+            metadata: {
+              mcp: {
+                server: "ui-server",
+                tool: "step1",
+                ui: { resourceUri: "ui://step1/progress.html", visibility: ["model", "app"] },
+                result: { content: [{ type: "text", text: "done" }] },
+              },
+            },
+          }),
+          toolPart("prt_c_step2", "ui-server_step2", "completed", {}, {
+            metadata: {
+              mcp: { server: "ui-server", tool: "step2", ui: { resourceUri: "ui://step2/progress.html", visibility: ["model", "app"] } },
+            },
+          }),
+        ]),
+      ],
+      mcpApps: stepMcpApps(["ui://step1/progress.html", "ui://step2/progress.html"]),
+    })
+
+    const panel = page.locator('[data-component="mcp-apps-panel"]')
+    await expect(panel).toBeVisible()
+
+    // 初始聚焦最新执行的 step2。
+    await expect(panel.getByRole("tab", { name: /step2 #2/ })).toHaveAttribute("aria-selected", "true")
+
+    // 切回 step1：iframe 重挂载后必须收到重放的 tool-result。
+    await panel.getByRole("tab", { name: /step1 #1/ }).click()
+    const iframe = panel.locator('iframe[sandbox="allow-scripts"]')
+    await expect(iframe.contentFrame().getByText("result:ok")).toBeVisible()
   })
 
   test("shows each call instance as its own tab with isolated progress", async ({ page }) => {

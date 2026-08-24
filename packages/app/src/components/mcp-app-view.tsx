@@ -164,6 +164,8 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     }
   })
   onCleanup(() => {
+    // 组件卸载后，任何在途 start() 作废（避免其 await 返回后污染已卸载的实例）。
+    startGeneration++
     unregister?.()
     resizeObserver?.disconnect()
     void bridge?.close()
@@ -177,11 +179,18 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     void bridge?.sendToolInputPartial({ arguments: partial })
   }
 
+  // 并发 start() 防护：快速切换 tab（resourceUri 变化）会多次触发 start()，只有最新一次
+  // 的结果允许生效。旧 start 在 await 返回后作废（丢弃 client / blobUrl 写入），
+  // 避免旧 tab 的 iframe/client 覆盖当前激活 tab，导致进度事件发向已卸载的 iframe。
+  let startGeneration = 0
+
   async function start() {
+    const generation = ++startGeneration
     void bridge?.close()
     bridge = undefined
     void client?.close()
     client = undefined
+    appTransport = undefined
     revoke?.()
     revoke = undefined
     appInitialized = false
@@ -204,9 +213,21 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
 
     try {
       await ensureConnected(directory)
+      if (generation !== startGeneration) {
+        void next.close()
+        return
+      }
       await next.connect(transport)
+      if (generation !== startGeneration) {
+        void next.close()
+        return
+      }
       client = next
       const html = await readUiResource(next, props.resourceUri)
+      if (generation !== startGeneration) {
+        void next.close()
+        return
+      }
       let url: string
       let sandboxTokens = "allow-scripts"
       if (html.text) {
@@ -225,6 +246,10 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
       setSandbox(sandboxTokens)
       setPhase("ready")
     } catch (error) {
+      if (generation !== startGeneration) {
+        void next.close()
+        return
+      }
       void next.close()
       const message = error instanceof Error ? error.message : String(error)
       setErrorMessage(message)
@@ -281,6 +306,9 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
   // The blob document replaces the initial about:blank window, so the bridge is
   // wired up only after the iframe finished loading the sandboxed document.
   async function onIframeLoad(iframe: HTMLIFrameElement) {
+    // 与 start() 共用代际令牌：旧 tab 的 onIframeLoad 若晚于新 tab 的 start() 完成，
+    // 必须作废，避免其 bridge/appTransport/appInitialized 覆盖新 tab 的状态。
+    const generation = startGeneration
     if (!client || !iframe.contentWindow) return
     const hostContext = buildHostContext({
       width: iframe.clientWidth || undefined,
@@ -300,6 +328,7 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     }
     next.oninitialized = () => {
       console.log(`[mcp-app] oninitialized bridge=${!!bridge} appInitializedBefore=${appInitialized} pendingLen=${pending.length}`)
+      if (generation !== startGeneration) return
       appInitialized = true
       if (props.fallbackData) void next.sendToolResult(props.fallbackData)
       if (bridge) drainPending()
@@ -369,7 +398,6 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
     }
     try {
       const transport = new PostMessageTransport(iframe.contentWindow, iframe.contentWindow)
-      appTransport = transport
       // Log host -> iframe `ui/notifications/*` dispatch (diagnostics only, no UI).
       const baseSend = transport.send.bind(transport)
       transport.send = async (message, options) => {
@@ -380,6 +408,11 @@ export const McpAppView: Component<McpAppViewProps> = (props) => {
         return baseSend(message, options)
       }
       await next.connect(transport)
+      if (generation !== startGeneration) {
+        void next.close()
+        return
+      }
+      appTransport = transport
       bridge = next
       // bridge 就绪后才冲刷初始化期间缓冲的流式事件，避免 forward 因 bridge 未赋值而丢弃。
       if (appInitialized) drainPending()

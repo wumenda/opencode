@@ -24,6 +24,8 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
   const state = props.state
 
   // groups 变化时自动选中首个 skill（与它的首个 tool）；组件禁用/清空时复位。
+  // 注意：undefined 是合法的直连组名，activeSkill=undefined 且存在直连组时不干预焦点，
+  // 避免"最新工具是直连调用"时被反复拉回第一个命名分组（tab 闪回根因之一）。
   createEffect(() => {
     const list = groups()
     if (list.length === 0) {
@@ -32,23 +34,26 @@ export function McpAppsPanel(props: McpAppsPanelProps): JSX.Element {
       return
     }
     const activeSkill = state.activeSkill()
-    const exists = activeSkill !== undefined && list.some((group) => group.name === activeSkill)
-    if (!exists) {
-      const first = list[0]
-      state.setActiveSkill(first.name)
-      state.setActiveTool(first.apps[0] ? toolTabId(first.apps[0]) : undefined)
-    }
+    if (list.some((group) => group.name === activeSkill)) return
+    const first = list[0]
+    state.setActiveSkill(first.name)
+    state.setActiveTool(first.apps[0] ? toolTabId(first.apps[0]) : undefined)
   })
 
   // 新 tool 执行时（latestExecuted.partID 变化），把右侧展示区 tab 焦点切换到该 tool 的 UI。
   // 同一 part 的进度刷新不会重复切换；同一 resourceUri 的重复执行（新 part）也会切换。
-  let lastExecutedPartID: string | undefined
+  // 焦点键 = partID + 实际所属分组：skill 标签由 currentSkill 游标随 part 流式更新而渐进
+  // 变化（skill part pending→running、或工具先以旧标签出现），partID 未变但分组重排时必须
+  // 跟随最新分组，避免"高亮新 tab、内容却闪回第一个 iframe"的错位。
+  let lastExecutedFocusKey: string | undefined
   createEffect(() => {
     const latest = props.latestExecuted()
     if (!latest) return
-    if (latest.partID === lastExecutedPartID) return
-    lastExecutedPartID = latest.partID
-    state.setActiveSkill(latest.app.skill)
+    const group = groups().find((g) => g.apps.some((a) => toolTabId(a) === toolTabId(latest.app)))
+    const focusKey = `${latest.partID}:${group?.name ?? ""}`
+    if (focusKey === lastExecutedFocusKey) return
+    lastExecutedFocusKey = focusKey
+    state.setActiveSkill(group?.name)
     state.setActiveTool(toolTabId(latest.app))
   })
 

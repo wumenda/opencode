@@ -33,6 +33,9 @@ export function createMcpAppHostRegistry(): McpAppHost {
   // 记住每个 App 最近一次的 tool-progress：iframe 因 timeline 重渲染/虚拟化被重挂载时，
   // 重放该进度让 step-ui 恢复最终进度，而不是重置回 "0% / 就绪"。
   const lastProgress = new Map<AppKey, McpAppEvent>()
+  // 记住每个 App 最近一次的 tool-result：懒挂载的 tab（面板）在工具完成后再注册 sink 时，
+  // 重放最终结果，否则重挂载的 iframe 永远等不到 tool-result（卡在加载/等待任务）。
+  const lastResult = new Map<AppKey, McpAppEvent>()
   return {
     register(key, sink) {
       let set = sinks.get(key)
@@ -41,13 +44,16 @@ export function createMcpAppHostRegistry(): McpAppHost {
         sinks.set(key, set)
       }
       set.add(sink)
+      // 重放顺序：pending 缓冲 → lastResult → lastProgress。
+      // pending 已含 tool-result 时跳过 lastResult，避免重复投递。
       const buffered = pending.get(key)
-      if (buffered) {
-        pending.delete(key)
-        buffered.forEach(sink)
-      }
+      if (buffered) pending.delete(key)
+      const replay: McpAppEvent[] = [...(buffered ?? [])]
+      const result = lastResult.get(key)
+      if (result && !replay.some((ev) => ev.type === "tool-result")) replay.push(result)
       const progress = lastProgress.get(key)
-      if (progress) sink(progress)
+      if (progress) replay.push(progress)
+      for (const ev of replay) sink(ev)
       return () => {
         const current = sinks.get(key)
         if (!current) return
@@ -57,6 +63,7 @@ export function createMcpAppHostRegistry(): McpAppHost {
     },
     push(key, event) {
       if (event.type === "tool-progress") lastProgress.set(key, event)
+      if (event.type === "tool-result") lastResult.set(key, event)
       const set = sinks.get(key)
       if (set && set.size > 0) {
         // 广播到同一 App 的所有挂载面（对话流工具卡 + 侧栏 skill tab 面板共用同一 key）。

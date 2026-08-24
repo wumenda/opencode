@@ -60,6 +60,19 @@ describe("createMcpAppHostRegistry", () => {
     expect(second).toEqual([{ type: "tool-progress", progress: 5, total: 5, message: "step 5/5" }])
   })
 
+  test("replays the last tool-result to a re-registered (remounted) app", () => {
+    const reg = createMcpAppHostRegistry()
+    const first: McpAppEvent[] = []
+    const firstUn = reg.register("a/ui://x", (e) => first.push(e))
+    reg.push("a/ui://x", { type: "tool-result", result: { content: [{ type: "text", text: "ok" }] } })
+    firstUn()
+
+    // 模拟懒挂载 tab 在工具完成后重挂载：应重放最终 tool-result，而不是空等。
+    const second: McpAppEvent[] = []
+    reg.register("a/ui://x", (e) => second.push(e))
+    expect(second).toEqual([{ type: "tool-result", result: { content: [{ type: "text", text: "ok" }] } }])
+  })
+
   test("broadcasts events to all sinks sharing the same app key", () => {
     const reg = createMcpAppHostRegistry()
     const timeline: McpAppEvent[] = []
