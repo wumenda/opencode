@@ -1,25 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "deepseek": {
-      "name": "DeepSeek",
-      "options": {
-        "apiKey": "sk-bc4a623c78434100bcba4d1f6ef96e33",
-        "baseURL": "https://api.deepseek.com",
-      },
-      "models": {
-        "deepseek-v4-flash-vision-exp": {
-          "name": "DeepSeek V4 Flash Vision Exp",
-          "tool_call": true,
-          "temperature": true,
-          "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"],
-          },
-        },
-      },
-    },
-  },
   "permission": {},
   "references": {
     "effect": {

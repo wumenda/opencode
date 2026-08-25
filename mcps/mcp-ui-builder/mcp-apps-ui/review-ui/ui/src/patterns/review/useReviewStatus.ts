@@ -33,6 +33,12 @@ export function useReviewStatus(): SessionStatus | null {
 
   if (app.status === 'initializing') return null;
 
+  // 终态优先：工具已完成（result_ready/error）后审核流程即结束。此时 progress.uiEvent
+  // 可能仍残留 review_pending（最终 tool-progress 回放携带），若先判断它会导致审核通过后
+  // 界面仍停在"等待审核"、按钮可点，永远走不到"已完成"。
+  if (app.status === 'result_ready') return 'completed';
+  if (app.status === 'error') return 'error';
+
   if (app.progress?.uiEvent?.review_pending) return 'waiting_review';
 
   return statusFromApp(app.status);

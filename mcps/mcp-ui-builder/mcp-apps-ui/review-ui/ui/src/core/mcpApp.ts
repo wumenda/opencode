@@ -213,13 +213,26 @@ class McpApp {
     const p = (params ?? {}) as Record<string, unknown>;
 
     switch (method) {
-      case 'ui/notifications/tool-input':
+      case 'ui/notifications/tool-input': {
+        const incoming = p as unknown as ToolInput;
+        // 幂等：同一会话的 tool-input 重复投递（宿主在 running→completed 时可能补推同一份
+        // 入参，或注册表重放）时，不清空进度/结果，避免"审核通过后回退首屏"。
+        // 仅当入参内容变化（真正的新会话）才重置上一会话的进度/结果/错误。
+        const prevInput = this.store.toolInput;
+        const sameSession =
+          prevInput != null && JSON.stringify(prevInput) === JSON.stringify(incoming);
+        if (sameSession) {
+          this.store = { ...this.store, toolInput: incoming };
+          this.emit();
+          break;
+        }
+
         // 新会话开始：清空上一会话的进度/结果/错误。
         // 否则旧 progress.uiEvent(如 review_id) 或旧 toolResult 残留，
         // 会导致 submitReview 用旧 review_id 提交、页面展示上一会话的数据。
         this.store = {
           ...this.store,
-          toolInput: p as unknown as ToolInput,
+          toolInput: incoming,
           status: 'processing',
           progress: null,
           progressEvents: [],
@@ -228,6 +241,7 @@ class McpApp {
         };
         this.emit();
         break;
+      }
 
       case 'ui/notifications/tool-result': {
         const result = p as unknown as ToolResult;

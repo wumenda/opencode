@@ -194,10 +194,12 @@
         if (!base || !path) return setStatus(st, "请填写基址与路径", false)
         setStatus(st, "请求中…")
         const url = base + "/api/fs/get/" + encodeURIComponent(path)
+        const params = new URLSearchParams(locParams())
+        const qs = params.toString() ? "?" + params : ""
         try {
-          const resp = await fetch(url, { headers: authHeader() })
+          const resp = await fetch(url + qs, { headers: authHeader() })
           const text = await resp.text()
-          log(`GET ${url} -> ${resp.status}`, text, resp.ok)
+          log(`GET ${url}${qs} -> ${resp.status}`, text, resp.ok)
           if (!resp.ok) return setStatus(st, `HTTP ${resp.status}`, false)
           const body = JSON.parse(text)
           const data = body.data ?? body

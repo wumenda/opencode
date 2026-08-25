@@ -132,11 +132,19 @@ export function McpTool(props: {
   // 工具运行中/完成且已渲染 App 时，把输入推送给宿主注册表（由 McpAppView 转发进 iframe）。
   // partial 保留流式语义（渐进渲染参数的 App / e2e 断言沿用），完整版供只监听
   // ui/notifications/tool-input 的模板使用。
+  // 完整版 tool-input 每个实例只推送一次：MCP 工具参数在调用时一次性确定，running 阶段已
+  // 推过的工具（如 review_tool 这类带进度/带 metadata.mcp 的工具），completed 时不再重推——
+  // 否则 iframe 端会把 tool-input 当作"新会话"清空 progress/toolResult（审核通过后回退首屏的
+  // 根因）。无进度工具 running 期 metadata.mcp 未写入、effect 不执行，completed 首推兜底
+  // 不受影响；晚挂载面板仍由注册表 lastToolInput 重放兜底。
+  let pushedToolInput = false
   createEffect(() => {
     const info = app()
     const input = partInput()
     if (!info || !input) return
     host.push(appKey(info), { type: "tool-input-partial", arguments: input })
+    if (pushedToolInput) return
+    pushedToolInput = true
     host.push(appKey(info), { type: "tool-input", arguments: input })
   })
 
